@@ -1,0 +1,3 @@
+[submodule "mavmap"]
+	path = mavmap
+	url = https://github.com/mavmap/mavmap
