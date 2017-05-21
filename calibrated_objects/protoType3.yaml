@@ -1,0 +1,10 @@
+ObjectID: 0
+name: nerfgun
+mesh: nerfgun
+zero_pose: &1 [4, -0.07006802409887314, -0.1308219879865646, 0.07396139949560165]
+sensor_relative_locations:
+  - *1
+  - *1
+  - *1
+  - *1
+  - *1
