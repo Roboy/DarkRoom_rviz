@@ -55,9 +55,9 @@ public:
      * Get the recent angles and timestamps
      * @param lighthouse of this lighthouse
      * @param angles Vector(VERTICAL, HORIZONTAL)
-     * @param timestamps in milliseconds
+     * @param timestamps as ros time
      */
-    void get(bool lighthouse, Vector2d &angles, Vector2s &timestamps);
+    void get(bool lighthouse, Vector2d &angles, ros::Time *timestamps);
 
     /**
      * Get the recent angles

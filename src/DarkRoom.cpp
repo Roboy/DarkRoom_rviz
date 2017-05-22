@@ -145,6 +145,15 @@ DarkRoom::DarkRoom(QWidget *parent)
     visualization_pub = nh->advertise<visualization_msgs::Marker>("visualization_marker", 100);
 
     resetLighthousePoses();
+
+    TrackedObjectPtr newObject = TrackedObjectPtr(new TrackedObject());
+    newObject->connectRoboy();
+    object_counter++;
+    trackedObjects[object_counter] = newObject;
+    QListWidgetItem *item = new QListWidgetItem;
+    item->setText("Roboy");
+    this->findChild<QListWidget *>("trackedObjects")->addItem(item);
+    ROS_INFO_STREAM("added Roboy");
 }
 
 DarkRoom::~DarkRoom() {

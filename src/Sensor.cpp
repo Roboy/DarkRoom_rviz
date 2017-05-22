@@ -30,12 +30,12 @@ void Sensor::get(bool lighthouse, Vector2d &angles){
                       m_angles_horizontal[m_switch?!lighthouse:lighthouse].second);
 }
 
-void Sensor::get(bool lighthouse, Vector2d &angles, Vector2s &timestamps){
+void Sensor::get(bool lighthouse, Vector2d &angles, ros::Time *timestamps){
     lock_guard<std::mutex> lock(m_lockMutex);
     angles = Vector2d(m_angles_vertical[m_switch?!lighthouse:lighthouse].second,
                       m_angles_horizontal[m_switch?!lighthouse:lighthouse].second);
-    timestamps = Vector2s(m_angles_vertical[m_switch?!lighthouse:lighthouse].first,
-                          m_angles_horizontal[m_switch?!lighthouse:lighthouse].first);
+    timestamps[0] = m_angleUpdateTime[m_switch?!lighthouse:lighthouse];
+    timestamps[1] = m_angleUpdateTime[m_switch?lighthouse:!lighthouse];
 }
 
 void Sensor::get(bool lighthouse, double &elevation, double &azimuth){

@@ -20,7 +20,7 @@ TrackedObject::TrackedObject() {
         ROS_WARN("could not get DARKROOM_CALIBRATED_OBJECTS environmental variable");
 
 
-    readConfig(path + "/nerfgun.yaml");
+//    readConfig(path + "/nerfgun.yaml");
 
     trackeObjectInstance++;
 }
@@ -92,6 +92,11 @@ bool TrackedObject::connectWifi(const char *TrackedObjectIP, int sensor_port, in
     }
 }
 
+void TrackedObject::connectRoboy(){
+    receiveData = true;
+    sensor_sub =  nh->subscribe("/roboy/middleware/DarkRoom/sensors", 1, &TrackedObject::receiveSensorDataRoboy, this);
+}
+
 void TrackedObject::startReceiveData(bool start) {
     if (start) {
         if (!receiveData) {
@@ -125,7 +130,8 @@ void TrackedObject::startReceiveData(bool start) {
 }
 
 void TrackedObject::startTracking(bool start) {
-    toggleTracking(start);
+    if(command_socket != nullptr)
+        toggleTracking(start);
     if (start) {
         if (!receiveData)
             startReceiveData(true);
@@ -476,6 +482,40 @@ void TrackedObject::receiveSensorData() {
     }
 }
 
+void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware::DarkRoom::ConstPtr &msg){
+    unsigned short timestamp = (unsigned short)(ros::Time::now().sec&0xFF);
+    for(uint32_t const &data:msg->sensor_value) {
+        uint id, lighthouse, rotor, sweepDuration;
+        std::bitset<32> x(data);
+//        ROS_INFO_STREAM(x);
+        int valid = (data >> 12) & 0x01;
+        id = (data & 0x01FF);
+        lighthouse = (data >> 9) & 0x01;
+        rotor = (data >> 10) & 0x01;
+        sweepDuration = (data >> 13) & 0x07FFFF;
+        ROS_INFO_STREAM_THROTTLE(1,"timestamp:     " << timestamp << endl <<
+                "valid:         " << valid << endl <<
+//                "id:            " << id << endl <<
+                "lighthouse:    " << lighthouse << endl <<
+                "rotor:         " << rotor << endl <<
+                "sweepDuration: " << sweepDuration);
+        if (valid == 1) {
+            if (recording) {
+                file << "\n---------------------------------------------\n"
+                     << "timestamp:     " << timestamp << endl
+                     << "id:            " << id << endl
+                     << "lighthouse:    " << lighthouse << endl
+                     << "rotor:         " << rotor << endl
+                     << "sweepDuration: " << sweepDuration;
+            }
+            ROS_WARN_THROTTLE(5,"receiving sensor data");
+            sensors[id].update(lighthouse,rotor,timestamp,uSecsToRadians(sweepDuration));
+        }else{
+            ROS_WARN_THROTTLE(5,"receiving sensor data, but it's not valid");
+        }
+    }
+}
+
 void TrackedObject::receiveImuData() {
     while (receiveData && connected) {
         DarkRoomProtobuf::imuObject msg;
@@ -491,8 +531,11 @@ void TrackedObject::receiveImuData() {
 }
 
 void TrackedObject::trackSensors() {
-    Vector2s timestamp0_new, timestamp1_new;
-    map<int, Vector2s> timestamps0_old, timestamps1_old;
+    ros::Duration duration(2);
+    duration.sleep();
+
+    ros::Time timestamp0_new[2], timestamp1_new[2];
+    map<int, ros::Time[2]> timestamps0_old, timestamps1_old;
     while (tracking) {
         for (auto &sensor : sensors) {
             if (sensor.second.isActive(0) && sensor.second.isActive(1)) {
@@ -502,13 +545,15 @@ void TrackedObject::trackSensors() {
                 sensor.second.get(1, lighthouse1_angles, timestamp1_new);
 
                 // check if this is actually new data
-                if (timestamps0_old[sensor.first].x() != timestamp0_new.x() &&
-                    timestamps0_old[sensor.first].y() != timestamp0_new.y() &&
-                    timestamps1_old[sensor.first].x() != timestamp1_new.x() &&
-                    timestamps1_old[sensor.first].y() != timestamp1_new.y()) {
+                if (timestamps0_old[sensor.first][0] != timestamp0_new[0] &&
+                    timestamps0_old[sensor.first][1] != timestamp0_new[1] &&
+                    timestamps1_old[sensor.first][0] != timestamp1_new[0] &&
+                    timestamps1_old[sensor.first][1] != timestamp1_new[1]) {
 
-                    timestamps0_old[sensor.first] = timestamp0_new;
-                    timestamps1_old[sensor.first] = timestamp1_new;
+                    timestamps0_old[sensor.first][0] = timestamp0_new[0];
+                    timestamps0_old[sensor.first][1] = timestamp0_new[1];
+                    timestamps1_old[sensor.first][0] = timestamp1_new[0];
+                    timestamps1_old[sensor.first][1] = timestamp1_new[1];
 
                     Vector3d triangulated_position, ray0, ray1;
                     triangulateFromLighthousePlanes(lighthouse0_angles, lighthouse1_angles, triangulated_position, ray0,
@@ -516,7 +561,8 @@ void TrackedObject::trackSensors() {
 
                     sensor.second.set(triangulated_position);
 
-                    publishSphere(triangulated_position, "world", "sensor_location",
+                    if(!isnan(triangulated_position[0]) && !isnan(triangulated_position[1]) && !isnan(triangulated_position[2]))
+                        publishSphere(triangulated_position, "world", "sensor_location",
                                   getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f, 1);
 
                     if (rays) {
@@ -547,8 +593,8 @@ void TrackedObject::calibrate() {
     ros::Time start_time = ros::Time::now();
     clearAll();
 
-    Vector2s timestamp0_new, timestamp1_new;
-    map<int, Vector2s> timestamps0_old, timestamps1_old;
+    ros::Time timestamp0_new[2], timestamp1_new[2];
+    map<int, ros::Time[2]> timestamps0_old, timestamps1_old;
 
     clearAll();
     ROS_INFO("measuring mean sensor positions for 30 seconds");
@@ -565,13 +611,15 @@ void TrackedObject::calibrate() {
                 sensor.second.get(1, lighthouse1_angles, timestamp1_new);
 
                 // check if this is actually new data
-                if (timestamps0_old[sensor.first].x() != timestamp0_new.x() &&
-                    timestamps0_old[sensor.first].y() != timestamp0_new.y() &&
-                    timestamps1_old[sensor.first].x() != timestamp1_new.x() &&
-                    timestamps1_old[sensor.first].y() != timestamp1_new.y()) {
+                if (timestamps0_old[sensor.first][0] != timestamp0_new[0] &&
+                    timestamps0_old[sensor.first][1] != timestamp0_new[1] &&
+                    timestamps1_old[sensor.first][0] != timestamp1_new[0] &&
+                    timestamps1_old[sensor.first][1] != timestamp1_new[1]) {
 
-                    timestamps0_old[sensor.first] = timestamp0_new;
-                    timestamps1_old[sensor.first] = timestamp1_new;
+                    timestamps0_old[sensor.first][0] = timestamp0_new[0];
+                    timestamps0_old[sensor.first][1] = timestamp0_new[1];
+                    timestamps1_old[sensor.first][0] = timestamp1_new[0];
+                    timestamps1_old[sensor.first][1] = timestamp1_new[1];
 
                     Vector3d position, ray0, ray1;
                     triangulateFromLighthousePlanes(lighthouse0_angles, lighthouse1_angles, position, ray0, ray1);

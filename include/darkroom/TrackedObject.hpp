@@ -8,6 +8,7 @@
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
 #include <tf_conversions/tf_eigen.h>
+#include <roboy_communication_middleware/DarkRoom.h>
 
 // Eigen
 #include <Eigen/Core>
@@ -26,6 +27,7 @@
 #include <deque>
 #include <thread>
 #include <mutex>
+#include <bitset>
 
 // yaml-cpp
 #include "yaml-cpp/yaml.h"
@@ -73,6 +75,11 @@ public:
      * @return success (if configure is false, this returns true even if there is no data coming from clientbool lighthouse)
      */
     bool connectWifi(const char *IP, int sensor_port, int command_port, int logging_port, bool configure=true);
+
+    /**
+     * This function initializes a subscriber for roboy darkroom
+     */
+    void connectRoboy();
 
     void startReceiveData(bool start);
     /**
@@ -162,6 +169,10 @@ private:
      * Continuesly receiving, decoding and updating the sensor data
      */
     void receiveSensorData();
+    /**
+     * Continuesly receiving, decoding and updating the sensor data
+     */
+    void receiveSensorDataRoboy(const roboy_communication_middleware::DarkRoom::ConstPtr &msg);
 
     /**
      * Continuesly receiving imu data
@@ -272,6 +283,7 @@ private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;
     ros::Publisher visualization_pub;
+    ros::Subscriber sensor_sub;
     tf::Transform relativeFrame;
     tf::TransformListener tf_listener;
     tf::TransformBroadcaster tf_broadcaster;

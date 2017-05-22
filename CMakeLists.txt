@@ -9,7 +9,8 @@ SET(CMAKE_BUILD_TYPE Debug)
 #==============================================================================
 # Dependencies
 #==============================================================================
-find_package(catkin REQUIRED COMPONENTS roscpp std_msgs message_generation rviz tf tf_conversions visualization_msgs )
+find_package(catkin REQUIRED COMPONENTS roscpp std_msgs message_generation rviz tf tf_conversions visualization_msgs
+		roboy_communication_middleware )
 
 # Qt5
 # Find includes in corresponding build directories
@@ -36,7 +37,7 @@ include_directories(${PROTOBUF_INCLUDE_DIR})
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS protobuf/lighthouse.proto)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-catkin_package(CATKIN_DEPENDS message_runtime )
+catkin_package(CATKIN_DEPENDS message_runtime roboy_communication_middleware )
 
 include_directories(
 		include/
