@@ -23,6 +23,7 @@ TrackedObject::TrackedObject() {
 //    readConfig(path + "/nerfgun.yaml");
 
     trackeObjectInstance++;
+
 }
 
 TrackedObject::~TrackedObject() {
@@ -485,34 +486,45 @@ void TrackedObject::receiveSensorData() {
 void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware::DarkRoom::ConstPtr &msg){
     unsigned short timestamp = (unsigned short)(ros::Time::now().sec&0xFF);
     for(uint32_t const &data:msg->sensor_value) {
-        uint id, lighthouse, rotor, sweepDuration;
         std::bitset<32> x(data);
-//        ROS_INFO_STREAM(x);
-        int valid = (data >> 12) & 0x01;
-        id = (data & 0x01FF);
-        lighthouse = (data >> 9) & 0x01;
-        rotor = (data >> 10) & 0x01;
-        sweepDuration = (data >> 13) & 0x07FFFF;
-        ROS_INFO_STREAM_THROTTLE(1,"timestamp:     " << timestamp << endl <<
-                "valid:         " << valid << endl <<
+        uint8_t sync0 = data&0xffff, sync1 = (data>>16)&0xff;
+        ROS_INFO_STREAM( x );
+        ROS_INFO("%d",(int)data);
+//        uint id, lighthouse, rotor, sweepDuration;
+//        int valid = (data >> 12) & 0x01;
+//        id = (data & 0x01FF);
+//        lighthouse = (data >> 9) & 0x01;
+//        rotor = (data >> 10) & 0x01;
+//        sweepDuration = (data >> 13) & 0x07FFFF;
+//        ROS_INFO_STREAM("timestamp:     " << timestamp << endl <<
+//                "valid:         " << valid << endl <<
 //                "id:            " << id << endl <<
-                "lighthouse:    " << lighthouse << endl <<
-                "rotor:         " << rotor << endl <<
-                "sweepDuration: " << sweepDuration);
-        if (valid == 1) {
+//                "lighthouse:    " << lighthouse << endl <<
+//                "rotor:         " << rotor << endl <<
+//                "sweepDuration: " << sweepDuration);
+//        if (valid == 1) {
             if (recording) {
-                file << "\n---------------------------------------------\n"
-                     << "timestamp:     " << timestamp << endl
-                     << "id:            " << id << endl
-                     << "lighthouse:    " << lighthouse << endl
-                     << "rotor:         " << rotor << endl
-                     << "sweepDuration: " << sweepDuration;
+                file << data << endl;
+//                file << "\n---------------------------------------------\n"
+//                     << "timestamp:     " << timestamp << endl
+//                     << "id:            " << id << endl
+//                     << "lighthouse:    " << lighthouse << endl
+//                     << "rotor:         " << rotor << endl
+//                     << "sweepDuration: " << sweepDuration;
             }
             ROS_WARN_THROTTLE(5,"receiving sensor data");
-            sensors[id].update(lighthouse,rotor,timestamp,uSecsToRadians(sweepDuration));
-        }else{
-            ROS_WARN_THROTTLE(5,"receiving sensor data, but it's not valid");
-        }
+//            sensors[id].update(lighthouse,rotor,timestamp,uSecsToRadians(sweepDuration));
+//        }else{
+//            ROS_WARN_THROTTLE(5,"receiving sensor data, but it's not valid");
+//        }
+//        std::bitset<32> x(data);
+//        uint8_t sync0 = data&0xffff, sync1 = (data>>16)&0xff;
+//        ROS_INFO_STREAM( x );
+//        ROS_INFO(
+//                "\nsync0:       %d\nsync1:       %d\n", (unsigned short)sync0, (unsigned short)sync1);
+//        if (recording) {
+//            file << (unsigned short)sync0 << " " << (unsigned short)sync1 << endl;
+//        }
     }
 }
 
