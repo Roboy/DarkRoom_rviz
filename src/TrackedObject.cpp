@@ -486,23 +486,46 @@ void TrackedObject::receiveSensorData() {
 void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware::DarkRoom::ConstPtr &msg){
     unsigned short timestamp = (unsigned short)(ros::Time::now().sec&0xFF);
     for(uint32_t const &data:msg->sensor_value) {
-        std::bitset<32> x(data);
-        uint8_t sync0 = data&0xffff, sync1 = (data>>16)&0xff;
-        ROS_INFO_STREAM( x );
-        ROS_INFO("%d",(int)data);
-//        uint id, lighthouse, rotor, sweepDuration;
-//        int valid = (data >> 12) & 0x01;
-//        id = (data & 0x01FF);
-//        lighthouse = (data >> 9) & 0x01;
-//        rotor = (data >> 10) & 0x01;
-//        sweepDuration = (data >> 13) & 0x07FFFF;
-//        ROS_INFO_STREAM("timestamp:     " << timestamp << endl <<
-//                "valid:         " << valid << endl <<
-//                "id:            " << id << endl <<
-//                "lighthouse:    " << lighthouse << endl <<
-//                "rotor:         " << rotor << endl <<
-//                "sweepDuration: " << sweepDuration);
-//        if (valid == 1) {
+
+        static uint id, lighthouse, rotor, sweepDuration;
+//        ROS_INFO("\nsync0:  %d\nsync1:  %d\n",(int)(data&0xff),(int)((data>>16)&0xff));
+//        if (recording) {
+//            file << (int)(data&0xff) << " " <<  (int)((data>>16)&0xff) << endl;
+//        }
+
+//        ROS_INFO("lighthouse %d",data);
+
+//        uint32_t val = data;
+//        if(val>8400) {
+//            val %= 8333;
+//            if(val > 5000)
+//                lighthouse = 0;
+//            else {
+//                val-=8333;
+//                if(val>300)
+//                    lighthouse = 1;
+//                else
+//                    lighthouse = 0;
+//            }
+//        }else if( val < 8000){
+//            lighthouse = 0;
+//        }
+//        ROS_INFO("lighthouse %d          %d", lighthouse, data);
+
+//        std::bitset<32> x(data);
+//        ROS_INFO_STREAM(x);
+        int valid = (data >> 12) & 0x01;
+        id = (data & 0x01FF);
+        lighthouse = (data >> 9) & 0x01;
+        rotor = (data >> 10) & 0x01;
+        sweepDuration = (data >> 13) & 0x07FFFF;
+        ROS_INFO_STREAM_THROTTLE(1,"timestamp:     " << timestamp << endl <<
+                "valid:         " << valid << endl <<
+                "id:            " << id << endl <<
+                "lighthouse:    " << lighthouse << endl <<
+                "rotor:         " << rotor << endl <<
+                "sweepDuration: " << sweepDuration);
+        if (valid == 1) {
             if (recording) {
                 file << data << endl;
 //                file << "\n---------------------------------------------\n"
@@ -512,11 +535,11 @@ void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware:
 //                     << "rotor:         " << rotor << endl
 //                     << "sweepDuration: " << sweepDuration;
             }
-            ROS_WARN_THROTTLE(5,"receiving sensor data");
-//            sensors[id].update(lighthouse,rotor,timestamp,uSecsToRadians(sweepDuration));
-//        }else{
-//            ROS_WARN_THROTTLE(5,"receiving sensor data, but it's not valid");
-//        }
+            ROS_WARN_THROTTLE(5, "receiving sensor data");
+            sensors[id].update(lighthouse,rotor,timestamp,uSecsToRadians(sweepDuration));
+        }else{
+            ROS_WARN_THROTTLE(5,"receiving sensor data, but it's not valid");
+        }
 //        std::bitset<32> x(data);
 //        uint8_t sync0 = data&0xffff, sync1 = (data>>16)&0xff;
 //        ROS_INFO_STREAM( x );
@@ -575,7 +598,7 @@ void TrackedObject::trackSensors() {
 
                     if(!isnan(triangulated_position[0]) && !isnan(triangulated_position[1]) && !isnan(triangulated_position[2]))
                         publishSphere(triangulated_position, "world", "sensor_location",
-                                  getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f, 1);
+                                  getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 1), 0.05f, 1);
 
                     if (rays) {
                         Vector3d pos(0, 0, 0);
@@ -874,7 +897,7 @@ TrackedObject::publishRay(Vector3d &pos, Vector3d &dir, const char *frame, const
     arrow.color.b = color.b;
     arrow.color.a = color.a;
     arrow.lifetime = ros::Duration(duration);
-    arrow.scale.x = 0.001;
+    arrow.scale.x = 0.005;
     arrow.scale.y = 0.03;
     arrow.scale.z = 0.03;
     arrow.action = visualization_msgs::Marker::ADD;
