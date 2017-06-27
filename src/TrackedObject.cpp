@@ -484,18 +484,18 @@ void TrackedObject::receiveSensorData() {
 
 void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware::DarkRoom::ConstPtr &msg){
     unsigned short timestamp = (unsigned short)(ros::Time::now().sec&0xFF);
+    uint id = 0;
     for(uint32_t const &data:msg->sensor_value) {
-        uint id, lighthouse, rotor, sweepDuration;
-        std::bitset<32> x(data);
+        uint lighthouse, rotor, sweepDuration;
+//        std::bitset<32> x(data);
 //        ROS_INFO_STREAM(x);
-        int valid = (data >> 12) & 0x01;
-        id = (data & 0x01FF);
-        lighthouse = (data >> 9) & 0x01;
-        rotor = (data >> 10) & 0x01;
-        sweepDuration = (data >> 13) & 0x07FFFF;
+        lighthouse = (data >> 31)&0x1;
+        rotor = (data >> 30)&0x1;
+        int valid = (data >> 29)&0x1;
+        sweepDuration = (data & 0x1fffffff)/50; // raw sensor duration is 50 ticks per microsecond
         ROS_INFO_STREAM_THROTTLE(1,"timestamp:     " << timestamp << endl <<
                 "valid:         " << valid << endl <<
-//                "id:            " << id << endl <<
+                "id:            " << id << endl <<
                 "lighthouse:    " << lighthouse << endl <<
                 "rotor:         " << rotor << endl <<
                 "sweepDuration: " << sweepDuration);
