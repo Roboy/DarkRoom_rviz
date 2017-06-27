@@ -16,11 +16,9 @@ TrackedObject::TrackedObject() {
     if (const char* env_p = getenv("DARKROOM_CALIBRATED_OBJECTS")) {
         path = env_p;
         ROS_INFO_STREAM("using DARKROOM_CALIBRATED_OBJECTS: " << path);
+        readConfig(path + "/protoType3.yaml");
     }else
         ROS_WARN("could not get DARKROOM_CALIBRATED_OBJECTS environmental variable");
-
-
-//    readConfig(path + "/nerfgun.yaml");
 
     trackeObjectInstance++;
 
@@ -195,6 +193,7 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> *specificIds
                 sensor.second.get(lighthouse, elevations, azimuths);
                 sensor.second.getRelativeLocation(relPos);
                 distanceToLighthouse.push_back(sensor.second.getDistance(lighthouse));
+                cout << sensor.first << endl;
             }
         }
     } else {
@@ -277,9 +276,9 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> *specificIds
 //        ROS_INFO_STREAM("v\n" << v);
 //        ROS_INFO_STREAM("d_old\n" << d_old);
         error = v.norm();
-        if (error < 0.0001) {
+        if (error < ERROR_THRESHOLD) {
             ROS_INFO_STREAM(
-                    "error below threshold in " << iterations << " iterations\n" << "v: " << v << "\nd: " << d_old);
+                    "error " << error << " below threshold " << ERROR_THRESHOLD << " in " << iterations << " iterations");
             uint i = 0;
             for (auto id:ids) {
                 ROS_INFO_STREAM("sensor:" << id << " distance to lighthouse " << lighthouse << ": " << d_old(i));
@@ -302,11 +301,15 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> *specificIds
 
                 i++;
 
-                publishSphere(relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), "sensor_location_estimated",
+                char str[100];
+                sprintf(str, "sensor_%d_estimated", id);
+
+                publishSphere(relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
                               getMessageID(DISTANCE, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.8), 0.01f, 100);
 
+                sprintf(str, "ray_%d", id);
                 Vector3d pos(0, 0, 0);
-                publishRay(pos, relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), "rays",
+                publishRay(pos, relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
                            getMessageID(RAY, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 1), 100);
             }
             return true;
@@ -323,21 +326,21 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> *specificIds
 }
 
 bool TrackedObject::poseEstimation(tf::Transform &tf) {
-    vector<int> ids = {0, 1, 3};
-    while (!distanceEstimation(0, &ids)) {
-        ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 0");
-    }
-    while (!distanceEstimation(1, &ids)) {
-        ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 1");
-    }
+//    vector<int> ids = {0, 1, 3};
+//    while (!distanceEstimation(0, &ids)) {
+//        ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 0");
+//    }
+//    while (!distanceEstimation(1, &ids)) {
+//        ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 1");
+//    }
 
-    PoseMinimizer minimizer;
+    PoseMinimizer minimizer(sensors.size());
 
     uint i = 0;
-    for (auto id:ids) {
+    for (auto &sensor:sensors) {
         Vector3d relLocation0, relLocation1;
-        sensors[id].get(0, relLocation0);
-        sensors[id].get(1, relLocation1);
+        sensors[sensor.first].get(0, relLocation0);
+        sensors[sensor.first].get(1, relLocation1);
         minimizer.pos3D_A.block(0, i, 4, 1) << relLocation0(0), relLocation0(1), relLocation0(2), 1;
         minimizer.pos3D_B.block(0, i, 4, 1) << relLocation1(0), relLocation1(1), relLocation1(2), 1;
         i++;
@@ -407,38 +410,6 @@ bool TrackedObject::readConfig(string filepath) {
     return true;
 }
 
-bool TrackedObject::writeConfig(string filepath) {
-    std::ofstream fout(filepath);
-    if (!fout.is_open()) {
-        ROS_WARN_STREAM("Could not write config " << filepath);
-        return false;
-    }
-
-    YAML::Node config;
-    config["ObjectID"] = objectID;
-    config["name"] = name;
-    config["mesh"] = mesh;
-    YAML::Node node = YAML::Load("[0, 0, 0, 0]");
-    node[0] = zero_pose[0];
-    node[1] = zero_pose[1];
-    node[2] = zero_pose[2];
-    node[3] = zero_pose[3];
-    config["zero_pose"] = node;
-    for (auto &sensor : sensors) {
-        Vector3d relative_location;
-        sensor.second.getRelativeLocation(relative_location);
-
-        // first number is the sensor id
-        node[0] = sensor.first;
-        for (int i = 1; i <= 3; i++) {
-            node[i] = relative_location(i - 1);
-        }
-        config["sensor_relative_locations"].push_back(node);
-    }
-    fout << config;
-    return true;
-}
-
 bool TrackedObject::rebootESP() {
     DarkRoomProtobuf::commandObject msg;
     msg.set_command(RESET);
@@ -446,19 +417,27 @@ bool TrackedObject::rebootESP() {
 }
 
 bool TrackedObject::toggleMPU6050(bool toggle) {
-    DarkRoomProtobuf::commandObject msg;
-    int command = MPU;
-    command |= toggle << 4;
-    msg.set_command(command);
-    return command_socket->sendMessage<DarkRoomProtobuf::commandObject>(msg);
+    if(command_socket!=nullptr) {
+        DarkRoomProtobuf::commandObject msg;
+        int command = MPU;
+        command |= toggle << 4;
+        msg.set_command(command);
+        return command_socket->sendMessage<DarkRoomProtobuf::commandObject>(msg);
+    }else{
+        return false;
+    }
 }
 
 bool TrackedObject::toggleTracking(bool toggle) {
-    DarkRoomProtobuf::commandObject msg;
-    int command = TRACKING;
-    command |= toggle << 4;
-    msg.set_command(command);
-    return command_socket->sendMessage<DarkRoomProtobuf::commandObject>(msg);
+    if(command_socket!=nullptr) {
+        DarkRoomProtobuf::commandObject msg;
+        int command = TRACKING;
+        command |= toggle << 4;
+        msg.set_command(command);
+        return command_socket->sendMessage<DarkRoomProtobuf::commandObject>(msg);
+    }else{
+        return false;
+    }
 }
 
 void TrackedObject::receiveSensorData() {
@@ -502,27 +481,19 @@ void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware:
                 "sweepDuration: " << sweepDuration);
         if (valid == 1) {
             if (recording) {
-                file << data << endl;
-//                file << "\n---------------------------------------------\n"
-//                     << "timestamp:     " << timestamp << endl
-//                     << "id:            " << id << endl
-//                     << "lighthouse:    " << lighthouse << endl
-//                     << "rotor:         " << rotor << endl
-//                     << "sweepDuration: " << sweepDuration;
+                file << "\n---------------------------------------------\n"
+                     << "timestamp:     " << timestamp << endl
+                     << "id:            " << id << endl
+                     << "lighthouse:    " << lighthouse << endl
+                     << "rotor:         " << rotor << endl
+                     << "sweepDuration: " << sweepDuration << endl;
             }
             ROS_WARN_THROTTLE(5, "receiving sensor data");
             sensors[id].update(lighthouse,rotor,timestamp,uSecsToRadians(sweepDuration));
         }else{
             ROS_WARN_THROTTLE(5,"receiving sensor data, but it's not valid");
         }
-//        std::bitset<32> x(data);
-//        uint8_t sync0 = data&0xffff, sync1 = (data>>16)&0xff;
-//        ROS_INFO_STREAM( x );
-//        ROS_INFO(
-//                "\nsync0:       %d\nsync1:       %d\n", (unsigned short)sync0, (unsigned short)sync1);
-//        if (recording) {
-//            file << (unsigned short)sync0 << " " << (unsigned short)sync1 << endl;
-//        }
+        id++;
     }
 }
 
@@ -571,17 +542,20 @@ void TrackedObject::trackSensors() {
 
                     sensor.second.set(triangulated_position);
 
-                    if(!isnan(triangulated_position[0]) && !isnan(triangulated_position[1]) && !isnan(triangulated_position[2]))
-                        publishSphere(triangulated_position, "world", "sensor_location",
-                                  getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 1), 0.05f, 1);
+                    if(!isnan(triangulated_position[0]) && !isnan(triangulated_position[1]) && !isnan(triangulated_position[2])){
+                        char str[100];
+                        sprintf(str, "sensor_%d", sensor.first);
+                        publishSphere(triangulated_position, "world", str,
+                                      getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f, 1);
+                    }
 
                     if (rays) {
                         Vector3d pos(0, 0, 0);
                         ray0 *= 5;
-                        publishRay(pos, ray0, "lighthouse1", "rays", getMessageID(RAY, sensor.first, 0),
+                        publishRay(pos, ray0, "lighthouse1", "rays_lighthouse_1", getMessageID(RAY, sensor.first, 0),
                                    COLOR(1, 0, 0, 1.0), 1);
                         ray1 *= 5;
-                        publishRay(pos, ray1, "lighthouse2", "rays", getMessageID(RAY, sensor.first, 1),
+                        publishRay(pos, ray1, "lighthouse2", "rays_lighthouse_2", getMessageID(RAY, sensor.first, 1),
                                    COLOR(1, 0, 0, 1.0), 1);
                     }
                 }
@@ -607,9 +581,9 @@ void TrackedObject::calibrate() {
     map<int, ros::Time[2]> timestamps0_old, timestamps1_old;
 
     clearAll();
-    ROS_INFO("measuring mean sensor positions for 30 seconds");
+    ROS_INFO("measuring mean sensor positions for 5 seconds");
     int message_counter = 0;
-    while ((ros::Time::now() - start_time) < ros::Duration(30) && calibrating) {
+    while ((ros::Time::now() - start_time) < ros::Duration(5) && calibrating) {
         uint done_counter = 0;
         for (auto &sensor : sensors) {
             // if the sensor is visible for both lighthouses and it is active
@@ -695,6 +669,39 @@ void TrackedObject::calibrate() {
         }
     }
     writeConfig(path + "/protoType3.yaml");
+}
+
+bool TrackedObject::writeConfig(string filepath) {
+    std::ofstream fout(filepath);
+    if (!fout.is_open()) {
+        ROS_WARN_STREAM("Could not write config " << filepath);
+        return false;
+    }
+
+    YAML::Node config;
+    config["ObjectID"] = objectID;
+    config["name"] = name;
+    config["mesh"] = mesh;
+    YAML::Node node = YAML::Load("[0, 0, 0, 0]");
+    node[0] = zero_pose[0];
+    node[1] = zero_pose[1];
+    node[2] = zero_pose[2];
+    node[3] = zero_pose[3];
+    config["zero_pose"] = node;
+    for (auto &sensor : sensors) {
+        YAML::Node node = YAML::Load("[0, 0, 0, 0]");
+        Vector3d relative_location;
+        sensor.second.getRelativeLocation(relative_location);
+        cout << relative_location << endl;
+        // first number is the sensor id
+        node[0] = sensor.first;
+        for (int i = 1; i <= 3; i++) {
+            node[i] = relative_location(i - 1);
+        }
+        config["sensor_relative_locations"].push_back(node);
+    }
+    fout << config;
+    return true;
 }
 
 void TrackedObject::publishRelativeFrame() {

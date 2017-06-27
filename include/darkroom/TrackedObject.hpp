@@ -43,6 +43,7 @@
 
 #define uSecsToRadians(ticks) (degreesToRadians(ticks * 0.0216))
 #define MAX_ITERATIONS 30
+#define ERROR_THRESHOLD 0.005
 //#define DEBUG
 // #define KALMAN
 
