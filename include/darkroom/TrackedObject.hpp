@@ -276,10 +276,22 @@ private:
      * @param frame in this frame
      * @param message_id a unique id
      * @param ns namespace
-     * @param rgda rgb color (0-1) plus transparancy
+     * @param color rgb color (0-1) plus transparancy
      * @param duration for this duration in seconds (0=forever)
      */
     void publishRay(Vector3d &pos, Vector3d &dir, const char* frame, const char* ns, int message_id, COLOR color, int duration=0);
+    /**
+     * Publishes a text message marker
+     * @param pos at this positon
+     * @param text with this text
+     * @param frame in this frame
+     * @param ns namespace
+     * @param message_id a unique id
+     * @param color rgb color (0-1) plus transparancy
+     * @param duration for this duration in seconds (0=forever)
+     * @param height height of the text
+     */
+    void publishText(Vector3d &pos, const char *text, const char *frame, const char *ns, int message_id, COLOR color, int duration, float height);
 private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;
@@ -301,6 +313,7 @@ private:
     bool receiveData = false, tracking = false, calibrating = false, connected = false, rays = false, recording = false,
             publishingRelativeFrame = false;
     map<int,Sensor> sensors;
+    vector<int> pose_correction_sensors;
     Vector3d origin;
     Vector4d pose;
     Vector4d zero_pose;
@@ -309,7 +322,8 @@ private:
     enum MESSAGE_ID{
         TRIANGULATED = 0,      // for each sensor
         DISTANCE = 1,           // for each sensor and lighthouse
-        RAY = 2   // for each sensor and lighthouse
+        RAY = 2,   // for each sensor and lighthouse
+        SENSOR_NAME = 3   // for each sensor
     };
 };
 

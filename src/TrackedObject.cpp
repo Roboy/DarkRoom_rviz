@@ -395,11 +395,6 @@ bool TrackedObject::readConfig(string filepath) {
     objectID = config["ObjectID"].as<int>();
     name = config["name"].as<string>();
     mesh = config["mesh"].as<string>();
-    vector<float> zero_pose_vector = config["zero_pose"].as<vector<float>>();
-    zero_pose[0] = zero_pose_vector[0];
-    zero_pose[1] = zero_pose_vector[1];
-    zero_pose[2] = zero_pose_vector[2];
-    zero_pose[3] = zero_pose_vector[3];
     vector<vector<float>> relative_locations = config["sensor_relative_locations"].as<vector<vector<float>>>();
     sensors.clear();
     for (int i = 0; i < relative_locations.size(); i++) {
@@ -407,6 +402,9 @@ bool TrackedObject::readConfig(string filepath) {
                 Vector3d(relative_locations[i][1], relative_locations[i][2],
                          relative_locations[i][3]));
     }
+    pose_correction_sensors = config["pose_correction_sensors"].as<vector<int>>();
+    if(!pose_correction_sensors.empty())
+
     return true;
 }
 
@@ -473,12 +471,12 @@ void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware:
         rotor = (data >> 30)&0x1;
         int valid = (data >> 29)&0x1;
         sweepDuration = (data & 0x1fffffff)/50; // raw sensor duration is 50 ticks per microsecond
-        ROS_INFO_STREAM_THROTTLE(1,"timestamp:     " << timestamp << endl <<
-                "valid:         " << valid << endl <<
-                "id:            " << id << endl <<
-                "lighthouse:    " << lighthouse << endl <<
-                "rotor:         " << rotor << endl <<
-                "sweepDuration: " << sweepDuration);
+//        ROS_INFO_STREAM_THROTTLE(1,"timestamp:     " << timestamp << endl <<
+//                "valid:         " << valid << endl <<
+//                "id:            " << id << endl <<
+//                "lighthouse:    " << lighthouse << endl <<
+//                "rotor:         " << rotor << endl <<
+//                "sweepDuration: " << sweepDuration);
         if (valid == 1) {
             if (recording) {
                 file << "\n---------------------------------------------\n"
@@ -547,6 +545,8 @@ void TrackedObject::trackSensors() {
                         sprintf(str, "sensor_%d", sensor.first);
                         publishSphere(triangulated_position, "world", str,
                                       getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f, 1);
+                        publishText(triangulated_position,str,"world","sensor_names",getMessageID(SENSOR_NAME, sensor.first),
+                                    COLOR(0, 1, 0, 0.8),1,0.05);
                     }
 
                     if (rays) {
@@ -682,13 +682,10 @@ bool TrackedObject::writeConfig(string filepath) {
     config["ObjectID"] = objectID;
     config["name"] = name;
     config["mesh"] = mesh;
-    YAML::Node node = YAML::Load("[0, 0, 0, 0]");
-    node[0] = zero_pose[0];
-    node[1] = zero_pose[1];
-    node[2] = zero_pose[2];
-    node[3] = zero_pose[3];
-    config["zero_pose"] = node;
     for (auto &sensor : sensors) {
+        if(!pose_correction_sensors.empty())
+            if(std::find(pose_correction_sensors.begin(), pose_correction_sensors.end(), sensor.first)==pose_correction_sensors.end())
+                continue; // we ignore the sensors that should not be used for pose correction
         YAML::Node node = YAML::Load("[0, 0, 0, 0]");
         Vector3d relative_location;
         sensor.second.getRelativeLocation(relative_location);
@@ -700,6 +697,12 @@ bool TrackedObject::writeConfig(string filepath) {
         }
         config["sensor_relative_locations"].push_back(node);
     }
+    YAML::Node node = YAML::Load("[]");
+    for(int sensor:pose_correction_sensors){
+        node.push_back(sensor);
+    }
+    config["pose_correction_sensors"] = node;
+
     fout << config;
     return true;
 }
@@ -784,7 +787,7 @@ void TrackedObject::clearAll() {
 }
 
 int TrackedObject::getMessageID(int type, int sensor, bool lighthouse) {
-    return trackeObjectInstance * 5 * sensors.size() +
+    return trackeObjectInstance * 6 * sensors.size() +
            type * (sensors.size() * NUMBER_OF_LIGHTHOUSES) + sensors.size() * lighthouse + sensor;
 }
 
@@ -898,4 +901,26 @@ TrackedObject::publishRay(Vector3d &pos, Vector3d &dir, const char *frame, const
     p.z += dir(2);
     arrow.points.push_back(p);
     visualization_pub.publish(arrow);
+}
+
+void TrackedObject::publishText(Vector3d &pos, const char *text, const char *frame, const char *ns, int message_id, COLOR color,
+                                int duration, float height) {
+    visualization_msgs::Marker text_msg;
+    text_msg.header.frame_id = frame;
+    text_msg.ns = ns;
+    text_msg.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+    text_msg.color.r = color.r;
+    text_msg.color.g = color.g;
+    text_msg.color.b = color.b;
+    text_msg.color.a = color.a;
+    text_msg.lifetime = ros::Duration(duration);
+    text_msg.scale.z = height;
+    text_msg.action = visualization_msgs::Marker::ADD;
+    text_msg.header.stamp = ros::Time::now();
+    text_msg.id = message_id;
+    text_msg.pose.position.x = pos(0);
+    text_msg.pose.position.y = pos(1);
+    text_msg.pose.position.z = pos(2);
+    text_msg.text = text;
+    visualization_pub.publish(text_msg);
 }
