@@ -3,6 +3,7 @@
 // ros
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
+#include <roboy_communication_middleware/DarkRoomSensor.h>
 
 #include <tf/tf.h>
 #include <tf/transform_listener.h>
@@ -42,8 +43,8 @@
 #define radiansToDegrees(angleRadians) (angleRadians * 180.0 / M_PI)
 
 #define uSecsToRadians(ticks) (degreesToRadians(ticks * 0.0216))
-#define MAX_ITERATIONS 30
-#define ERROR_THRESHOLD 0.005
+#define MAX_ITERATIONS 100
+#define ERROR_THRESHOLD 0.001
 //#define DEBUG
 // #define KALMAN
 
@@ -59,6 +60,8 @@ struct COLOR{
     COLOR(float r, float g, float b, float a):r(r),g(g),b(b),a(a){};
     float r,g,b,a;
 };
+
+static vector<int> DEFAULT_VECTOR;
 
 class TrackedObject {
 public:
@@ -113,7 +116,7 @@ public:
      * @param specificIds if defined, waits until the specified sensors become active
      * @return
      */
-    bool distanceEstimation(bool lighthouse, vector<int> *specificIds = nullptr);
+    bool distanceEstimation(bool lighthouse, vector<int> &specificIds = DEFAULT_VECTOR);
 
     /**
      * Estimates the pose correction between ligthhouse 1 and 2, such that the squared distances between sensor positions
@@ -292,10 +295,12 @@ private:
      * @param height height of the text
      */
     void publishText(Vector3d &pos, const char *text, const char *frame, const char *ns, int message_id, COLOR color, int duration, float height);
+public:
+    vector<int> pose_correction_sensors;
 private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;
-    ros::Publisher visualization_pub;
+    ros::Publisher visualization_pub, sensor_location_pub;
     ros::Subscriber sensor_sub;
     tf::Transform relativeFrame;
     tf::TransformListener tf_listener;
@@ -313,7 +318,6 @@ private:
     bool receiveData = false, tracking = false, calibrating = false, connected = false, rays = false, recording = false,
             publishingRelativeFrame = false;
     map<int,Sensor> sensors;
-    vector<int> pose_correction_sensors;
     Vector3d origin;
     Vector4d pose;
     Vector4d zero_pose;

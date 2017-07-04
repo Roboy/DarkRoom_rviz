@@ -254,15 +254,15 @@ void DarkRoom::clearAll() {
 }
 
 void DarkRoom::resetLighthousePoses(){
-    tf_world.setOrigin(tf::Vector3(0, 0, 2.0));
+    tf_world.setOrigin(tf::Vector3(1.52/2.0, 0, 1.0));
     tf::Quaternion quat;
     quat.setRPY(M_PI / 2, 0, 0);
     tf_world.setRotation(quat);
     quat.setRPY(0, 0, 0);
     lighthouse1.setOrigin(tf::Vector3(0, 0, 0));
     lighthouse1.setRotation(quat);
-    quat.setRPY(0, M_PI, 0);
-    lighthouse2.setOrigin(tf::Vector3(0, 0, -2.0));
+    quat.setRPY(0, 0, 0);
+    lighthouse2.setOrigin(tf::Vector3(-1.52, 0, 0));
     lighthouse2.setRotation(quat);
 }
 
@@ -307,8 +307,8 @@ void DarkRoom::calibrate() {
 void DarkRoom::estimateDistance() {
     for(auto const &object:trackedObjects){
         object.second->startTracking(false);
-        object.second->distanceEstimation(0);
-        object.second->distanceEstimation(1);
+        object.second->distanceEstimation(0, object.second->pose_correction_sensors);
+        object.second->distanceEstimation(1, object.second->pose_correction_sensors);
         object.second->startTracking(true);
     }
 }

@@ -12,6 +12,7 @@ TrackedObject::TrackedObject() {
     nh = ros::NodeHandlePtr(new ros::NodeHandle);
 
     visualization_pub = nh->advertise<visualization_msgs::Marker>("visualization_marker", 100);
+    sensor_location_pub = nh->advertise<roboy_communication_middleware::DarkRoomSensor>("/roboy/middleware/DarkRoom/sensor_location", 1);
 
     if (const char* env_p = getenv("DARKROOM_CALIBRATED_OBJECTS")) {
         path = env_p;
@@ -179,12 +180,13 @@ void TrackedObject::map_lighthouse_id(bool switchID) {
     }
 }
 
-bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> *specificIds) {
+bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds) {
+    ROS_INFO_STREAM("estimating distance of sensors to lighthouse " << lighthouse+1);
     vector<Vector3d> relPos;
     vector<double> elevations, azimuths;
     vector<double> distanceToLighthouse;
     vector<int> ids;
-    if (specificIds == nullptr) {
+    if (specificIds.empty()) {
         // let's see who is active
         for (auto &sensor : sensors) {
             // skip inactive sensors
@@ -200,29 +202,29 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> *specificIds
         uint sensor_counter = 0;
         // wait until all requested sensors are active
         ros::Time start_time = ros::Time::now();
-        while ((ros::Time::now() - start_time) < ros::Duration(5) && sensor_counter < specificIds->size()) {
+        while ((ros::Time::now() - start_time) < ros::Duration(5) && sensor_counter < specificIds.size()) {
             sensor_counter = 0;
-            for (uint i = 0; i < specificIds->size(); i++) {
+            for (uint i = 0; i < specificIds.size(); i++) {
                 // skip inactive sensors
-                if (sensors[specificIds->at(i)].isActive(lighthouse)) {
-                    ROS_INFO("sensor%d active", specificIds->at(i));
+                if (sensors[specificIds.at(i)].isActive(lighthouse)) {
+                    ROS_INFO("sensor%d active", specificIds.at(i));
                     sensor_counter++;
                 } else {
-                    ROS_WARN("sensor%d inactive", specificIds->at(i));
+                    ROS_WARN_THROTTLE(1,"sensor%d inactive", specificIds.at(i));
                 }
             }
             ROS_INFO_THROTTLE(1, "waiting for specific sensors to become active");
         }
-        if (sensor_counter < specificIds->size()) {
+        if (sensor_counter < specificIds.size()) {
             ROS_WARN("time out waiting for specific sensors");
             return false;
         }
         // get the values now that all requested sensors are active
-        for (uint i = 0; i < specificIds->size(); i++) {
-            ids.push_back(specificIds->at(i));
-            sensors[specificIds->at(i)].get(lighthouse, elevations, azimuths);
-            sensors[specificIds->at(i)].getRelativeLocation(relPos);
-            distanceToLighthouse.push_back(sensors[specificIds->at(i)].getDistance(lighthouse));
+        for (uint i = 0; i < specificIds.size(); i++) {
+            ids.push_back(specificIds.at(i));
+            sensors[specificIds.at(i)].get(lighthouse, elevations, azimuths);
+            sensors[specificIds.at(i)].getRelativeLocation(relPos);
+            distanceToLighthouse.push_back(sensors[specificIds.at(i)].getDistance(lighthouse));
         }
     }
     if (ids.size() < 3)
@@ -276,74 +278,106 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> *specificIds
 //        ROS_INFO_STREAM("v\n" << v);
 //        ROS_INFO_STREAM("d_old\n" << d_old);
         error = v.norm();
-        if (error < ERROR_THRESHOLD) {
+        if (error/(double)ids.size() < ERROR_THRESHOLD) {
             ROS_INFO_STREAM(
                     "error " << error << " below threshold " << ERROR_THRESHOLD << " in " << iterations << " iterations");
-            uint i = 0;
-            for (auto id:ids) {
-                ROS_INFO_STREAM("sensor:" << id << " distance to lighthouse " << lighthouse << ": " << d_old(i));
-
-                // sweep planes
-                Eigen::Vector3d vertic(axis_offset, -cos(elevations[i]), -sin(elevations[i]));
-                Eigen::Vector3d horizo(cos(azimuths[i]), axis_offset, -sin(azimuths[i]));
-
-                // calc normals
-                Eigen::Vector3d n_horizo = horizo.cross(Eigen::Vector3d::UnitY());
-                n_horizo.normalize();
-                Eigen::Vector3d n_vertic = vertic.cross(Eigen::Vector3d::UnitX());
-                n_vertic.normalize();
-
-                // calc line direction from cross product of hyperplane normals
-                Eigen::Vector3d u0 = n_horizo.cross(n_vertic);
-
-                Vector3d relLocation(d_old(i) * u0(0), d_old(i) * u0(1), d_old(i) * u0(2));
-                sensors[id].set(lighthouse, relLocation);
-
-                i++;
-
-                char str[100];
-                sprintf(str, "sensor_%d_estimated", id);
-
-                publishSphere(relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
-                              getMessageID(DISTANCE, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.8), 0.01f, 100);
-
-                sprintf(str, "ray_%d", id);
-                Vector3d pos(0, 0, 0);
-                publishRay(pos, relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
-                           getMessageID(RAY, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 1), 100);
-            }
-            return true;
+            break;
         }
         // construct distance new vector, sharing data with the stl container
         Map<VectorXd> d_new(distanceToLighthouse.data(), distanceToLighthouse.size());
         d_new = d_old - (J.transpose() * J).inverse() * J.transpose() * v;
         iterations++;
     }
-    if (iterations == MAX_ITERATIONS) {
-        ROS_WARN_STREAM("maximum number of iterations reached, error: " << error);
+
+    uint i = 0;
+    for (auto id:ids) {
+        ROS_INFO_STREAM("sensor:" << id << " distance to lighthouse " << lighthouse << ": " << d_old(i));
+
+        // sweep planes
+        Eigen::Vector3d vertic(axis_offset, -cos(elevations[i]), -sin(elevations[i]));
+        Eigen::Vector3d horizo(cos(azimuths[i]), axis_offset, -sin(azimuths[i]));
+
+        // calc normals
+        Eigen::Vector3d n_horizo = horizo.cross(Eigen::Vector3d::UnitY());
+        n_horizo.normalize();
+        Eigen::Vector3d n_vertic = vertic.cross(Eigen::Vector3d::UnitX());
+        n_vertic.normalize();
+
+        // calc line direction from cross product of hyperplane normals
+        Eigen::Vector3d u0 = n_horizo.cross(n_vertic);
+
+        Vector3d relLocation(d_old(i) * u0(0), d_old(i) * u0(1), d_old(i) * u0(2));
+        sensors[id].set(lighthouse, relLocation);
+
+        i++;
+
+        char str[100];
+        sprintf(str, "sensor_%d_estimated", id);
+
+        publishSphere(relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
+                      getMessageID(DISTANCE, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.8), 0.01f, 100);
+
+        sprintf(str, "ray_%d", id);
+        Vector3d pos(0, 0, 0);
+        publishRay(pos, relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
+                   getMessageID(RAY, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 1), 100);
+    }
+
+    if (iterations >= MAX_ITERATIONS || error >= ERROR_THRESHOLD/(double)ids.size()) {
+        ROS_WARN_STREAM("distance estimation failed after " << iterations << " error: " << error);
         return false;
+    }else{
+        return true;
     }
 }
 
 bool TrackedObject::poseEstimation(tf::Transform &tf) {
-//    vector<int> ids = {0, 1, 3};
-//    while (!distanceEstimation(0, &ids)) {
-//        ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 0");
-//    }
-//    while (!distanceEstimation(1, &ids)) {
-//        ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 1");
-//    }
+    ros::Time start_time = ros::Time::now();
+    while (!distanceEstimation(0, pose_correction_sensors) ) {
+        ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 0, are the sensors visible to lighthouse 0?!");
+        if((ros::Time::now()-start_time).sec>10){
+            ROS_WARN("time out");
+            return false;
+        }
+    }
+    start_time = ros::Time::now();
+    while (!distanceEstimation(1, pose_correction_sensors)) {
+        ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 1, are the sensors visible to lighthouse 1?!");
+        if((ros::Time::now()-start_time).sec>10){
+            ROS_WARN("time out");
+            return false;
+        }
+    }
 
-    PoseMinimizer minimizer(sensors.size());
+    int number_of_sensors = 0;
+    if(pose_correction_sensors.empty())
+        number_of_sensors = sensors.size();
+    else
+        number_of_sensors = pose_correction_sensors.size();
 
-    uint i = 0;
-    for (auto &sensor:sensors) {
-        Vector3d relLocation0, relLocation1;
-        sensors[sensor.first].get(0, relLocation0);
-        sensors[sensor.first].get(1, relLocation1);
-        minimizer.pos3D_A.block(0, i, 4, 1) << relLocation0(0), relLocation0(1), relLocation0(2), 1;
-        minimizer.pos3D_B.block(0, i, 4, 1) << relLocation1(0), relLocation1(1), relLocation1(2), 1;
-        i++;
+    PoseMinimizer minimizer(number_of_sensors);
+
+
+    if(pose_correction_sensors.empty()) {
+        uint i = 0;
+        for (auto &sensor:sensors) {
+            Vector3d relLocation0, relLocation1;
+            sensors[sensor.first].get(0, relLocation0);
+            sensors[sensor.first].get(1, relLocation1);
+            minimizer.pos3D_A.block(0, i, 4, 1) << relLocation0(0), relLocation0(1), relLocation0(2), 1;
+            minimizer.pos3D_B.block(0, i, 4, 1) << relLocation1(0), relLocation1(1), relLocation1(2), 1;
+            i++;
+        }
+    }else{
+        uint i = 0;
+        for (auto &sensor:pose_correction_sensors) {
+            Vector3d relLocation0, relLocation1;
+            sensors[sensor].get(0, relLocation0);
+            sensors[sensor].get(1, relLocation1);
+            minimizer.pos3D_A.block(0, i, 4, 1) << relLocation0(0), relLocation0(1), relLocation0(2), 1;
+            minimizer.pos3D_B.block(0, i, 4, 1) << relLocation1(0), relLocation1(1), relLocation1(2), 1;
+            i++;
+        }
     }
 
     VectorXd pose(6);
@@ -516,6 +550,7 @@ void TrackedObject::trackSensors() {
     ros::Time timestamp0_new[2], timestamp1_new[2];
     map<int, ros::Time[2]> timestamps0_old, timestamps1_old;
     while (tracking) {
+        roboy_communication_middleware::DarkRoomSensor msg;
         for (auto &sensor : sensors) {
             if (sensor.second.isActive(0) && sensor.second.isActive(1)) {
                 Vector2d lighthouse0_angles;
@@ -548,6 +583,12 @@ void TrackedObject::trackSensors() {
                         sprintf(str, "%d", sensor.first);
                         publishText(triangulated_position,str,"world","sensor_names",getMessageID(SENSOR_NAME, sensor.first),
                                     COLOR(0, 1, 0, 0.1),1,0.05);
+                        msg.ids.push_back(sensor.first);
+                        geometry_msgs::Vector3 v;
+                        v.x = triangulated_position[0];
+                        v.y = triangulated_position[1];
+                        v.z = triangulated_position[2];
+                        msg.position.push_back(v);
                     }
 
                     if (rays) {
@@ -564,6 +605,7 @@ void TrackedObject::trackSensors() {
                 ROS_INFO_THROTTLE(1, "sensor %d not active", sensor.first);
             }
         }
+        sensor_location_pub.publish(msg);
     }
 }
 
@@ -582,10 +624,9 @@ void TrackedObject::calibrate() {
     map<int, ros::Time[2]> timestamps0_old, timestamps1_old;
 
     clearAll();
-    ROS_INFO("measuring mean sensor positions for 5 seconds");
+    ROS_INFO("measuring mean sensor positions for 10 seconds");
     int message_counter = 0;
-    while ((ros::Time::now() - start_time) < ros::Duration(5) && calibrating) {
-        uint done_counter = 0;
+    while ((ros::Time::now() - start_time) < ros::Duration(10) && calibrating) {
         for (auto &sensor : sensors) {
             // if the sensor is visible for both lighthouses and it is active
             if (sensor.second.isActive(0) && sensor.second.isActive(1)) {
@@ -609,8 +650,16 @@ void TrackedObject::calibrate() {
                     Vector3d position, ray0, ray1;
                     triangulateFromLighthousePlanes(lighthouse0_angles, lighthouse1_angles, position, ray0, ray1);
 
-                    sensorPosition3d[sensor.first].push_back(position);
-                    number_of_samples[sensor.first]++;
+                    if(sensorPosition3d[sensor.first].size()>0) {
+                        Vector3d diff = sensorPosition3d[sensor.first].back()-position;
+                        if (diff.norm() < 0.1) { // reject outliers
+                            sensorPosition3d[sensor.first].push_back(position);
+                            number_of_samples[sensor.first]++;
+                        }
+                    }else{
+                        sensorPosition3d[sensor.first].push_back(position);
+                        number_of_samples[sensor.first]++;
+                    }
 
                     publishSphere(position, "world", "sensor_calibration", message_counter++, COLOR(1, 0, 0, 0.1),
                                   0.005f, 100);
@@ -636,37 +685,82 @@ void TrackedObject::calibrate() {
     map<int, Vector3d> mean;
     map<int, Vector3d> variance;
     int active_sensors = 0;
-    for (auto const &sensor : sensors) {
-        if (number_of_samples[sensor.first] > 0) {
-            mean[sensor.first] = Vector3d(0.0, 0.0, 0.0);
-            for (auto pos:sensorPosition3d[sensor.first]) {
-                mean[sensor.first] += pos;
-            }
-            mean[sensor.first] /= number_of_samples[sensor.first];
-            variance[sensor.first] = Vector3d(0.0, 0.0, 0.0);
-            for (auto pos:sensorPosition3d[sensor.first]) {
-                variance[sensor.first](0) += pow(pos.x() - mean[sensor.first].x(), 2.0);
-                variance[sensor.first](1) += pow(pos.y() - mean[sensor.first].y(), 2.0);
-                variance[sensor.first](2) += pow(pos.z() - mean[sensor.first].z(), 2.0);
-            }
-            variance[sensor.first] /= number_of_samples[sensor.first];
-            ROS_INFO_STREAM("\nsensor " << sensor.first << "\nmean " << mean[sensor.first] << "\nvariance "
-                                        << variance[sensor.first]);
-            active_sensors++;
-        }
-        origin += mean[sensor.first];
-    }
-    origin /= active_sensors;
-    publishSphere(origin, "world", "origin", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
+
     // set the relative sensor location for each sensor wrt the origin
-    for (auto &sensor : sensors) {
-        if (number_of_samples[sensor.first] > 0) {
-            Vector3d rel;
-            rel = mean[sensor.first] - origin;
-            sensor.second.setRelativeLocation(rel);
-            ROS_INFO_STREAM(rel.norm());
-            publishSphere(mean[sensor.first], "world", "mean", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
-            publishRay(origin, rel, "world", "relative", message_counter++, COLOR(1, 1, 0, 1.0));
+    if(pose_correction_sensors.empty()) {
+        for (auto const &sensor : sensors) {
+            if (number_of_samples[sensor.first] > 0) {
+                mean[sensor.first] = Vector3d(0.0, 0.0, 0.0);
+                for (auto pos:sensorPosition3d[sensor.first]) {
+                    mean[sensor.first] += pos;
+                }
+                mean[sensor.first] /= number_of_samples[sensor.first];
+                variance[sensor.first] = Vector3d(0.0, 0.0, 0.0);
+                for (auto pos:sensorPosition3d[sensor.first]) {
+                    variance[sensor.first](0) += pow(pos.x() - mean[sensor.first].x(), 2.0);
+                    variance[sensor.first](1) += pow(pos.y() - mean[sensor.first].y(), 2.0);
+                    variance[sensor.first](2) += pow(pos.z() - mean[sensor.first].z(), 2.0);
+                }
+                variance[sensor.first] /= number_of_samples[sensor.first];
+                ROS_INFO_STREAM("sensor " << sensor.first << " mean("
+                                          << mean[sensor.first][0] <<", " << mean[sensor.first][1] <<", " << mean[sensor.first][2] << ") variance("
+                                          << variance[sensor.first][0] <<", " << variance[sensor.first][1] <<", " << variance[sensor.first][2] << ")");
+                active_sensors++;
+            }
+            origin += mean[sensor.first];
+        }
+        if(active_sensors==0){
+            ROS_WARN("there haven't been recorded any samples for one sensor, aborting");
+            return;
+        }
+        origin/=(double)active_sensors;
+        publishSphere(origin, "world", "origin", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
+        for (auto &sensor : sensors) {
+            if (number_of_samples[sensor.first] > 0) {
+                Vector3d rel;
+                rel = mean[sensor.first] - origin;
+                sensor.second.setRelativeLocation(rel);
+                ROS_INFO_STREAM("origin(" << origin[0] << ", " << origin[1] << ", " << origin[2] << ")");
+                publishSphere(mean[sensor.first], "world", "mean", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
+                publishRay(origin, rel, "world", "relative", message_counter++, COLOR(1, 1, 0, 1.0));
+            }
+        }
+    }else{
+        for (auto const &sensor : pose_correction_sensors) {
+            if (number_of_samples[sensor] > 0) {
+                mean[sensor] = Vector3d(0.0, 0.0, 0.0);
+                for (auto pos:sensorPosition3d[sensor]) {
+                    mean[sensor] += pos;
+                }
+                mean[sensor] /= number_of_samples[sensor];
+                variance[sensor] = Vector3d(0.0, 0.0, 0.0);
+                for (auto pos:sensorPosition3d[sensor]) {
+                    variance[sensor](0) += pow(pos.x() - mean[sensor].x(), 2.0);
+                    variance[sensor](1) += pow(pos.y() - mean[sensor].y(), 2.0);
+                    variance[sensor](2) += pow(pos.z() - mean[sensor].z(), 2.0);
+                }
+                variance[sensor] /= number_of_samples[sensor];
+                ROS_INFO_STREAM("sensor " << sensor << " mean("
+                                          << mean[sensor][0] <<", " << mean[sensor][1] <<", " << mean[sensor][2] << ") variance("
+                                          << variance[sensor][0] <<", " << variance[sensor][1] <<", " << variance[sensor][2] << ")");
+                active_sensors++;
+            }
+            origin += mean[sensor];
+        }
+        if(active_sensors==0){
+            ROS_WARN("there haven't been recorded any samples for one sensor, aborting");
+            return;
+        }
+        origin/=(double)active_sensors;
+        for (auto &sensor : pose_correction_sensors) {
+            if (number_of_samples[sensor] > 0) {
+                Vector3d rel;
+                rel = mean[sensor] - origin;
+                sensors[sensor].setRelativeLocation(rel);
+                ROS_INFO_STREAM("origin(" << origin[0] << ", " << origin[1] << ", " << origin[2] << ")");
+                publishSphere(mean[sensor], "world", "mean", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
+                publishRay(origin, rel, "world", "relative", message_counter++, COLOR(1, 1, 0, 1.0));
+            }
         }
     }
     writeConfig(path + "/protoType3.yaml");
@@ -690,6 +784,8 @@ bool TrackedObject::writeConfig(string filepath) {
         YAML::Node node = YAML::Load("[0, 0, 0, 0]");
         Vector3d relative_location;
         sensor.second.getRelativeLocation(relative_location);
+        if(relative_location.norm()>10000) // we skip sensor values that are not finite
+            continue;
         cout << relative_location << endl;
         // first number is the sensor id
         node[0] = sensor.first;
@@ -788,7 +884,7 @@ void TrackedObject::clearAll() {
 }
 
 int TrackedObject::getMessageID(int type, int sensor, bool lighthouse) {
-    return trackeObjectInstance * 6 * sensors.size() +
+    return trackeObjectInstance * 5 * sensors.size() +
            type * (sensors.size() * NUMBER_OF_LIGHTHOUSES) + sensors.size() * lighthouse + sensor;
 }
 
@@ -842,6 +938,11 @@ void TrackedObject::publishSphere(Vector3d &pos, const char *frame, const char *
     sphere.pose.position.x = pos(0);
     sphere.pose.position.y = pos(1);
     sphere.pose.position.z = pos(2);
+    sphere.pose.position.z = pos(2);
+    sphere.pose.orientation.x = 1;
+    sphere.pose.orientation.y = 0;
+    sphere.pose.orientation.z = 0;
+    sphere.pose.orientation.w = 0;
     visualization_pub.publish(sphere);
 }
 
