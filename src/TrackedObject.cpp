@@ -545,8 +545,9 @@ void TrackedObject::trackSensors() {
                         sprintf(str, "sensor_%d", sensor.first);
                         publishSphere(triangulated_position, "world", str,
                                       getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f, 1);
+                        sprintf(str, "%d", sensor.first);
                         publishText(triangulated_position,str,"world","sensor_names",getMessageID(SENSOR_NAME, sensor.first),
-                                    COLOR(0, 1, 0, 0.8),1,0.05);
+                                    COLOR(0, 1, 0, 0.1),1,0.05);
                     }
 
                     if (rays) {
