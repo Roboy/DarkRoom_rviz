@@ -10,7 +10,7 @@ SET(CMAKE_BUILD_TYPE Debug)
 # Dependencies
 #==============================================================================
 find_package(catkin REQUIRED COMPONENTS roscpp std_msgs message_generation rviz tf tf_conversions visualization_msgs
-		roboy_communication_middleware )
+		roboy_communication_middleware common_utilities )
 
 # Qt5
 # Find includes in corresponding build directories
@@ -37,7 +37,7 @@ include_directories(${PROTOBUF_INCLUDE_DIR})
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS protobuf/lighthouse.proto)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-catkin_package(CATKIN_DEPENDS message_runtime roboy_communication_middleware )
+catkin_package(CATKIN_DEPENDS message_runtime roboy_communication_middleware common_utilities )
 
 include_directories(
 		include/
@@ -49,6 +49,7 @@ include_directories(
 		${Qt5Gui_INCLUDE_DIRS}
         ${OpenCV_INCLUDE_DIRS}
         ${ncurses_INCLUDE_DIRS}
+		../common_utilities/include
 )
 #==============================================================================
 # Application
@@ -68,7 +69,7 @@ target_link_libraries( TrackedObject ${yaml-cpp_LIBRARIES} ${catkin_LIBRARIES} $
 
 qt5_wrap_cpp(MOC_FILES include/darkroom/DarkRoom.hpp include/darkroom/TrackedObjectDelegate.hpp)
 add_library( darkroom src/DarkRoom.cpp src/TrackedObjectDelegate.cpp ${MOC_FILES} )
-target_link_libraries( darkroom ${QT_LIBRARIES} ${catkin_LIBRARIES} TrackedObject)
+target_link_libraries( darkroom ${QT_LIBRARIES} ${catkin_LIBRARIES} TrackedObject rviz_visualization)
 
 add_executable( CommunicationTest src/CommunicationTest.cpp )
 target_link_libraries( CommunicationTest ${catkin_LIBRARIES} UDPSocket )
