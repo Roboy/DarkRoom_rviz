@@ -37,7 +37,7 @@ DarkRoom::DarkRoom(QWidget *parent)
 
     QLabel *IP_label = new QLabel("IP:");
     connectWidget->layout()->addWidget(IP_label);
-    QLineEdit *IP_line = new QLineEdit("10.25.12.189");
+    QLineEdit *IP_line = new QLineEdit("192.168.0.107");
     IP_line->setObjectName("IP");
     connectWidget->layout()->addWidget(IP_line);
 
@@ -46,6 +46,12 @@ DarkRoom::DarkRoom(QWidget *parent)
     QLineEdit *sensor_port_line = new QLineEdit("4210");
     sensor_port_line->setObjectName("client_port");
     connectWidget->layout()->addWidget(sensor_port_line);
+
+    QLabel *lighthousedistance_label = new QLabel("lighthouse distance:");
+    connectWidget->layout()->addWidget(lighthousedistance_label);
+    QLineEdit *lighthouse_distance = new QLineEdit("2.0");
+    lighthouse_distance->setObjectName("lighthouse_distance");
+    connectWidget->layout()->addWidget(lighthouse_distance);
 
     QPushButton *connect_button = new QPushButton(tr("connect"));
     connect(connect_button, SIGNAL(clicked()), this, SLOT(connectTo()));
@@ -254,7 +260,10 @@ void DarkRoom::clearAll() {
 }
 
 void DarkRoom::resetLighthousePoses(){
-    tf_world.setOrigin(tf::Vector3(1.52/2.0, 0, 1.0));
+    QLineEdit *w = this->findChild<QLineEdit *>("lighthouse_distance");
+    float ligthouse_distance = atof(w->text().toStdString().c_str());
+
+    tf_world.setOrigin(tf::Vector3(0, 0, 1.8));
     tf::Quaternion quat;
     quat.setRPY(M_PI / 2, 0, 0);
     tf_world.setRotation(quat);
@@ -262,7 +271,7 @@ void DarkRoom::resetLighthousePoses(){
     lighthouse1.setOrigin(tf::Vector3(0, 0, 0));
     lighthouse1.setRotation(quat);
     quat.setRPY(0, 0, 0);
-    lighthouse2.setOrigin(tf::Vector3(-1.52, 0, 0));
+    lighthouse2.setOrigin(tf::Vector3(ligthouse_distance, 0, 0));
     lighthouse2.setRotation(quat);
 }
 
