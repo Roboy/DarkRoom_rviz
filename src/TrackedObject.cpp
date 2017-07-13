@@ -12,6 +12,7 @@ TrackedObject::TrackedObject() {
     nh = ros::NodeHandlePtr(new ros::NodeHandle);
 
     sensor_location_pub = nh->advertise<roboy_communication_middleware::DarkRoomSensor>("/roboy/middleware/DarkRoom/sensor_location", 1);
+    visualization_pub = nh->advertise<visualization_msgs::Marker>("visualization_marker", 1);
 
     if (const char* env_p = getenv("DARKROOM_CALIBRATED_OBJECTS")) {
         path = env_p;
