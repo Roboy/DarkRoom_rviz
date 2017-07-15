@@ -49,7 +49,7 @@ DarkRoom::DarkRoom(QWidget *parent)
 
     QLabel *lighthousedistance_label = new QLabel("lighthouse distance:");
     connectWidget->layout()->addWidget(lighthousedistance_label);
-    QLineEdit *lighthouse_distance = new QLineEdit("2.0");
+    QLineEdit *lighthouse_distance = new QLineEdit("1,4");
     lighthouse_distance->setObjectName("lighthouse_distance");
     connectWidget->layout()->addWidget(lighthouse_distance);
 
