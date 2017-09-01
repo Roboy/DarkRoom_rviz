@@ -575,11 +575,14 @@ void TrackedObject::trackSensors() {
 
                     sensor.second.set(triangulated_position);
 
-                    if(!isnan(triangulated_position[0]) && !isnan(triangulated_position[1]) && !isnan(triangulated_position[2])){
-                        char str[100];
+                    if(!triangulated_position.hasNaN()){
+                        char str[100], str2[2];
                         sprintf(str, "sensor_%d", sensor.first);
                         publishSphere(triangulated_position, "world", str,
-                                      getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f, 1);
+                                      getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f, 0.1);
+                        sprintf(str2, "%d", sensor.first);
+                        publishText(triangulated_position, str2, "world", str, getMessageID(SENSOR_NAME, sensor.first),
+                                    COLOR(1,0,0,0.5), 0.1, 0.04f);
                         msg.ids.push_back(sensor.first);
                         geometry_msgs::Vector3 v;
                         v.x = triangulated_position[0];
@@ -668,12 +671,12 @@ void TrackedObject::calibrate() {
         }
     }
 
-    toggleMPU6050(true);
-    while ((ros::Time::now() - start_time) < ros::Duration(5) && calibrating){
-        ROS_INFO_THROTTLE(1,"waiting a couple of seconds for fresh imu data");
-    }
-    zero_pose = pose;
-    toggleMPU6050(false);
+//    toggleMPU6050(true);
+//    while ((ros::Time::now() - start_time) < ros::Duration(5) && calibrating){
+//        ROS_INFO_THROTTLE(1,"waiting a couple of seconds for fresh imu data");
+//    }
+//    zero_pose = pose;
+//    toggleMPU6050(false);
 
     // start tracking again
     startTracking(true);
@@ -687,7 +690,7 @@ void TrackedObject::calibrate() {
     // set the relative sensor location for each sensor wrt the origin
     if(pose_correction_sensors.empty()) {
         for (auto const &sensor : sensors) {
-            if (number_of_samples[sensor.first] > 0) {
+            if (number_of_samples[sensor.first] > 200) {
                 mean[sensor.first] = Vector3d(0.0, 0.0, 0.0);
                 for (auto pos:sensorPosition3d[sensor.first]) {
                     mean[sensor.first] += pos;
@@ -702,16 +705,21 @@ void TrackedObject::calibrate() {
                 variance[sensor.first] /= number_of_samples[sensor.first];
                 ROS_INFO_STREAM("sensor " << sensor.first << " mean("
                                           << mean[sensor.first][0] <<", " << mean[sensor.first][1] <<", " << mean[sensor.first][2] << ") variance("
-                                          << variance[sensor.first][0] <<", " << variance[sensor.first][1] <<", " << variance[sensor.first][2] << ")");
+                                          << variance[sensor.first][0] <<", " << variance[sensor.first][1] <<", " << variance[sensor.first][2] << ")"
+                                          << " " << "number of samples" << number_of_samples[sensor.first]);
                 active_sensors++;
+                origin += mean[sensor.first];
             }
-            origin += mean[sensor.first];
         }
         if(active_sensors==0){
             ROS_WARN("there haven't been recorded any samples for one sensor, aborting");
             return;
         }
         origin/=(double)active_sensors;
+        if(origin.hasNaN()) {
+            ROS_WARN("origin not finite, aborting");
+            return;
+        }
         publishSphere(origin, "world", "origin", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
         for (auto &sensor : sensors) {
             if (number_of_samples[sensor.first] > 0) {
