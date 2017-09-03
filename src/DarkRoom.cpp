@@ -49,7 +49,7 @@ DarkRoom::DarkRoom(QWidget *parent)
 
     QLabel *lighthousedistance_label = new QLabel("lighthouse distance:");
     connectWidget->layout()->addWidget(lighthousedistance_label);
-    QLineEdit *lighthouse_distance = new QLineEdit("1,4");
+    QLineEdit *lighthouse_distance = new QLineEdit("2,0");
     lighthouse_distance->setObjectName("lighthouse_distance");
     connectWidget->layout()->addWidget(lighthouse_distance);
 
@@ -267,10 +267,10 @@ void DarkRoom::resetLighthousePoses(){
     tf::Quaternion quat;
     quat.setRPY(M_PI / 2, 0, 0);
     tf_world.setRotation(quat);
-    quat.setRPY(0, 0, 0);
+    quat.setRPY(0, M_PI / 2 + M_PI, 0);
     lighthouse1.setOrigin(tf::Vector3(0, 0, 0));
     lighthouse1.setRotation(quat);
-    quat.setRPY(0, 0, 0);
+    quat.setRPY(0, M_PI / 2, 0);
     lighthouse2.setOrigin(tf::Vector3(ligthouse_distance, 0, 0));
     lighthouse2.setRotation(quat);
 }
@@ -316,8 +316,8 @@ void DarkRoom::calibrate() {
 void DarkRoom::estimateDistance() {
     for(auto const &object:trackedObjects){
         object.second->startTracking(false);
-        object.second->distanceEstimation(0, object.second->pose_correction_sensors);
-        object.second->distanceEstimation(1, object.second->pose_correction_sensors);
+        object.second->distanceEstimation(0, object.second->calibrated_sensors);
+        object.second->distanceEstimation(1, object.second->calibrated_sensors);
         object.second->startTracking(true);
     }
 }

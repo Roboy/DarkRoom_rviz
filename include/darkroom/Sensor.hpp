@@ -121,13 +121,19 @@ public:
      * Sets the sensors relative location on the tracked object
      * @param relative_location the relative 3D position
      */
-    void setRelativeLocation(Vector3d relative_location);
+    void setRelativeLocation(Vector3d &relative_location);
 
     /**
      * Gets the sensors relative location on the tracked object
      * @param relative_location the relative 3D position
      */
     void getRelativeLocation(Vector3d &relative_location);
+
+    /**
+     * Indicates if the sensor was used in calibration
+     * @return true/false
+     */
+    bool sensorCalibrated();
 
     /**
      * pushes the sensors relative location on the tracked object
@@ -146,4 +152,5 @@ private:
     pair<unsigned short, double> m_angles_horizontal[NUMBER_OF_LIGHTHOUSES], m_angles_vertical[NUMBER_OF_LIGHTHOUSES];
     ros::Time m_angleUpdateTime[NUMBER_OF_LIGHTHOUSES];
     mutex m_lockMutex;
+    bool calibrated = false;
 };

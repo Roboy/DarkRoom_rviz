@@ -72,15 +72,20 @@ double Sensor::getDistance(bool lighthouse){
 }
 
 bool Sensor::isActive(bool lighthouse){
-    return (ros::Time::now() - m_angleUpdateTime[m_switch?!lighthouse:lighthouse]) < ros::Duration(0.1);
+    return (ros::Time::now() - m_angleUpdateTime[m_switch?!lighthouse:lighthouse]) < ros::Duration(1.0);
 }
 
-void Sensor::setRelativeLocation(Vector3d relative_location){
+void Sensor::setRelativeLocation(Vector3d &relative_location){
     m_relative_location = relative_location;
+    calibrated = true;
 }
 
 void Sensor::getRelativeLocation(Vector3d &relative_location){
     relative_location = m_relative_location;
+}
+
+bool Sensor::sensorCalibrated(){
+    return calibrated;
 }
 
 void Sensor::getRelativeLocation(vector<Vector3d> &relative_locations){

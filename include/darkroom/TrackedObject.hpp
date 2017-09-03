@@ -45,8 +45,9 @@
 #define radiansToDegrees(angleRadians) (angleRadians * 180.0 / M_PI)
 
 #define uSecsToRadians(ticks) (degreesToRadians(ticks * 0.0216))
+#define ticksToRadians(ticks) (degreesToRadians(ticks * 0.0216 / 50.0))
 #define MAX_ITERATIONS 100
-#define ERROR_THRESHOLD 0.001
+#define ERROR_THRESHOLD 0.0001
 //#define DEBUG
 // #define KALMAN
 
@@ -233,7 +234,7 @@ private:
      */
     int getMessageID(int type, int sensor, bool lighthouse = false);
 public:
-    vector<int> pose_correction_sensors;
+    vector<int> calibrated_sensors;
 private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;

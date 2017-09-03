@@ -201,20 +201,20 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
     } else {
         uint sensor_counter = 0;
         // wait until all requested sensors are active
-        ros::Time start_time = ros::Time::now();
-        while ((ros::Time::now() - start_time) < ros::Duration(5) && sensor_counter < specificIds.size()) {
+//        ros::Time start_time = ros::Time::now();
+//        while ((ros::Time::now() - start_time) < ros::Duration(5) && sensor_counter < specificIds.size()) {
             sensor_counter = 0;
             for (uint i = 0; i < specificIds.size(); i++) {
                 // skip inactive sensors
                 if (sensors[specificIds.at(i)].isActive(lighthouse)) {
-                    ROS_INFO("sensor%d active", specificIds.at(i));
+//                    ROS_INFO("sensor%d active", specificIds.at(i));
                     sensor_counter++;
                 } else {
                     ROS_WARN_THROTTLE(1,"sensor%d inactive", specificIds.at(i));
                 }
             }
-            ROS_INFO_THROTTLE(1, "waiting for specific sensors to become active");
-        }
+//            ROS_INFO_THROTTLE(1, "waiting for specific sensors to become active");
+//        }
         if (sensor_counter < specificIds.size()) {
             ROS_WARN("time out waiting for specific sensors");
             return false;
@@ -274,13 +274,13 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
         for (uint i = 0; i < ids.size(); i++) {
             d_old(i) = distanceToLighthouse[i];
         }
-        // ROS_INFO_STREAM("J\n" << J);
+//         ROS_INFO_STREAM("J\n" << J);
 //        ROS_INFO_STREAM("v\n" << v);
 //        ROS_INFO_STREAM("d_old\n" << d_old);
-        error = v.norm();
-        if (error/(double)ids.size() < ERROR_THRESHOLD) {
+        error = v.norm()/(double)ids.size();
+        if (error < ERROR_THRESHOLD) {
             ROS_INFO_STREAM(
-                    "error " << error << " below threshold " << ERROR_THRESHOLD << " in " << iterations << " iterations");
+                    "mean squared error " << error << " below threshold " << ERROR_THRESHOLD << " in " << iterations << " iterations");
             break;
         }
         // construct distance new vector, sharing data with the stl container
@@ -315,25 +315,26 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
         sprintf(str, "sensor_%d_estimated", id);
 
         publishSphere(relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
-                      getMessageID(DISTANCE, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.8), 0.01f, 100);
+                      getMessageID(DISTANCE, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.3), 0.01f, 100);
 
         sprintf(str, "ray_%d", id);
         Vector3d pos(0, 0, 0);
         publishRay(pos, relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
-                   getMessageID(RAY, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 1), 100);
+                   getMessageID(RAY, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.3), 100);
     }
 
-    if (iterations >= MAX_ITERATIONS || error >= ERROR_THRESHOLD/(double)ids.size()) {
-        ROS_WARN_STREAM("distance estimation failed after " << iterations << " error: " << error);
-        return false;
-    }else{
-        return true;
-    }
+//    if (iterations >= MAX_ITERATIONS || error >= ERROR_THRESHOLD) {
+//        ROS_WARN_STREAM("distance estimation failed after " << iterations << " error: " << error);
+//        return false;
+//    }else{
+//        return true;
+//    }
+    return true;
 }
 
 bool TrackedObject::poseEstimation(tf::Transform &tf) {
     ros::Time start_time = ros::Time::now();
-    while (!distanceEstimation(0, pose_correction_sensors) ) {
+    while (!distanceEstimation(0, calibrated_sensors) ) {
         ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 0, are the sensors visible to lighthouse 0?!");
         if((ros::Time::now()-start_time).sec>10){
             ROS_WARN("time out");
@@ -341,7 +342,7 @@ bool TrackedObject::poseEstimation(tf::Transform &tf) {
         }
     }
     start_time = ros::Time::now();
-    while (!distanceEstimation(1, pose_correction_sensors)) {
+    while (!distanceEstimation(1, calibrated_sensors)) {
         ROS_INFO_THROTTLE(1, "could not estimate relative distance to lighthouse 1, are the sensors visible to lighthouse 1?!");
         if((ros::Time::now()-start_time).sec>10){
             ROS_WARN("time out");
@@ -350,15 +351,15 @@ bool TrackedObject::poseEstimation(tf::Transform &tf) {
     }
 
     int number_of_sensors = 0;
-    if(pose_correction_sensors.empty())
+    if(calibrated_sensors.empty())
         number_of_sensors = sensors.size();
     else
-        number_of_sensors = pose_correction_sensors.size();
+        number_of_sensors = calibrated_sensors.size();
 
     PoseMinimizer minimizer(number_of_sensors);
 
 
-    if(pose_correction_sensors.empty()) {
+    if(calibrated_sensors.empty()) {
         uint i = 0;
         for (auto &sensor:sensors) {
             Vector3d relLocation0, relLocation1;
@@ -370,7 +371,7 @@ bool TrackedObject::poseEstimation(tf::Transform &tf) {
         }
     }else{
         uint i = 0;
-        for (auto &sensor:pose_correction_sensors) {
+        for (auto &sensor:calibrated_sensors) {
             Vector3d relLocation0, relLocation1;
             sensors[sensor].get(0, relLocation0);
             sensors[sensor].get(1, relLocation1);
@@ -431,13 +432,12 @@ bool TrackedObject::readConfig(string filepath) {
     mesh = config["mesh"].as<string>();
     vector<vector<float>> relative_locations = config["sensor_relative_locations"].as<vector<vector<float>>>();
     sensors.clear();
+    calibrated_sensors.clear();
     for (int i = 0; i < relative_locations.size(); i++) {
-        sensors[relative_locations[i][0]].setRelativeLocation(
-                Vector3d(relative_locations[i][1], relative_locations[i][2],
-                         relative_locations[i][3]));
+        Vector3d relLocation(relative_locations[i][1], relative_locations[i][2], relative_locations[i][3]);
+        sensors[relative_locations[i][0]].setRelativeLocation(relLocation);
+        calibrated_sensors.push_back((int)relative_locations[i][0]);
     }
-    pose_correction_sensors = config["pose_correction_sensors"].as<vector<int>>();
-    if(!pose_correction_sensors.empty())
 
     return true;
 }
@@ -504,7 +504,7 @@ void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware:
         lighthouse = (data >> 31)&0x1;
         rotor = (data >> 30)&0x1;
         int valid = (data >> 29)&0x1;
-        sweepDuration = (data & 0x1fffffff)/50; // raw sensor duration is 50 ticks per microsecond
+        sweepDuration = (data & 0x1fffffff); // raw sensor duration is 50 ticks per microsecond
 //        ROS_INFO_STREAM_THROTTLE(1,"timestamp:     " << timestamp << endl <<
 //                "valid:         " << valid << endl <<
 //                "id:            " << id << endl <<
@@ -521,7 +521,7 @@ void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware:
                      << "sweepDuration: " << sweepDuration << endl;
             }
             ROS_WARN_THROTTLE(5, "receiving sensor data");
-            sensors[id].update(lighthouse,rotor,timestamp,uSecsToRadians(sweepDuration));
+            sensors[id].update(lighthouse,rotor,timestamp,ticksToRadians(sweepDuration));
         }else{
             ROS_WARN_THROTTLE(5,"receiving sensor data, but it's not valid");
         }
@@ -665,7 +665,6 @@ void TrackedObject::calibrate() {
                     publishSphere(position, "world", "sensor_calibration", message_counter++, COLOR(1, 0, 0, 0.1),
                                   0.005f, 100);
 
-                    printf(".");
                 }
             }
         }
@@ -685,88 +684,57 @@ void TrackedObject::calibrate() {
     origin = Vector3d(0, 0, 0);
     map<int, Vector3d> mean;
     map<int, Vector3d> variance;
+    map<int, bool> sensor_accepted;
     int active_sensors = 0;
 
     // set the relative sensor location for each sensor wrt the origin
-    if(pose_correction_sensors.empty()) {
-        for (auto const &sensor : sensors) {
-            if (number_of_samples[sensor.first] > 200) {
-                mean[sensor.first] = Vector3d(0.0, 0.0, 0.0);
-                for (auto pos:sensorPosition3d[sensor.first]) {
-                    mean[sensor.first] += pos;
-                }
-                mean[sensor.first] /= number_of_samples[sensor.first];
-                variance[sensor.first] = Vector3d(0.0, 0.0, 0.0);
-                for (auto pos:sensorPosition3d[sensor.first]) {
-                    variance[sensor.first](0) += pow(pos.x() - mean[sensor.first].x(), 2.0);
-                    variance[sensor.first](1) += pow(pos.y() - mean[sensor.first].y(), 2.0);
-                    variance[sensor.first](2) += pow(pos.z() - mean[sensor.first].z(), 2.0);
-                }
-                variance[sensor.first] /= number_of_samples[sensor.first];
-                ROS_INFO_STREAM("sensor " << sensor.first << " mean("
-                                          << mean[sensor.first][0] <<", " << mean[sensor.first][1] <<", " << mean[sensor.first][2] << ") variance("
-                                          << variance[sensor.first][0] <<", " << variance[sensor.first][1] <<", " << variance[sensor.first][2] << ")"
-                                          << " " << "number of samples" << number_of_samples[sensor.first]);
+    for (auto const &sensor : sensors) {
+        if (number_of_samples[sensor.first] > 200) {
+            mean[sensor.first] = Vector3d(0.0, 0.0, 0.0);
+            for (auto pos:sensorPosition3d[sensor.first]) {
+                mean[sensor.first] += pos;
+            }
+            mean[sensor.first] /= number_of_samples[sensor.first];
+            variance[sensor.first] = Vector3d(0.0, 0.0, 0.0);
+            for (auto pos:sensorPosition3d[sensor.first]) {
+                variance[sensor.first](0) += pow(pos.x() - mean[sensor.first].x(), 2.0);
+                variance[sensor.first](1) += pow(pos.y() - mean[sensor.first].y(), 2.0);
+                variance[sensor.first](2) += pow(pos.z() - mean[sensor.first].z(), 2.0);
+            }
+            variance[sensor.first] /= number_of_samples[sensor.first];
+            ROS_INFO_STREAM("sensor " << sensor.first << " mean("
+                                      << mean[sensor.first][0] <<", " << mean[sensor.first][1] <<", " << mean[sensor.first][2] << ") variance("
+                                      << variance[sensor.first][0] <<", " << variance[sensor.first][1] <<", " << variance[sensor.first][2] << ")"
+                                      << " " << "number of samples" << number_of_samples[sensor.first]);
+            if(variance[sensor.first].norm()>0) {
+                sensor_accepted[sensor.first] = true;
                 active_sensors++;
                 origin += mean[sensor.first];
+            }else{
+                sensor_accepted[sensor.first] = false;
             }
+        }else{
+            ROS_INFO("rejecting sensor %d, because it does not have enough samples (%d)", sensor.first, number_of_samples[sensor.first] );
         }
-        if(active_sensors==0){
-            ROS_WARN("there haven't been recorded any samples for one sensor, aborting");
-            return;
-        }
-        origin/=(double)active_sensors;
-        if(origin.hasNaN()) {
-            ROS_WARN("origin not finite, aborting");
-            return;
-        }
-        publishSphere(origin, "world", "origin", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
-        for (auto &sensor : sensors) {
-            if (number_of_samples[sensor.first] > 0) {
-                Vector3d rel;
-                rel = mean[sensor.first] - origin;
-                sensor.second.setRelativeLocation(rel);
-                ROS_INFO_STREAM("origin(" << origin[0] << ", " << origin[1] << ", " << origin[2] << ")");
-                publishSphere(mean[sensor.first], "world", "mean", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
-                publishRay(origin, rel, "world", "relative", message_counter++, COLOR(1, 1, 0, 1.0));
-            }
-        }
-    }else{
-        for (auto const &sensor : pose_correction_sensors) {
-            if (number_of_samples[sensor] > 0) {
-                mean[sensor] = Vector3d(0.0, 0.0, 0.0);
-                for (auto pos:sensorPosition3d[sensor]) {
-                    mean[sensor] += pos;
-                }
-                mean[sensor] /= number_of_samples[sensor];
-                variance[sensor] = Vector3d(0.0, 0.0, 0.0);
-                for (auto pos:sensorPosition3d[sensor]) {
-                    variance[sensor](0) += pow(pos.x() - mean[sensor].x(), 2.0);
-                    variance[sensor](1) += pow(pos.y() - mean[sensor].y(), 2.0);
-                    variance[sensor](2) += pow(pos.z() - mean[sensor].z(), 2.0);
-                }
-                variance[sensor] /= number_of_samples[sensor];
-                ROS_INFO_STREAM("sensor " << sensor << " mean("
-                                          << mean[sensor][0] <<", " << mean[sensor][1] <<", " << mean[sensor][2] << ") variance("
-                                          << variance[sensor][0] <<", " << variance[sensor][1] <<", " << variance[sensor][2] << ")");
-                active_sensors++;
-            }
-            origin += mean[sensor];
-        }
-        if(active_sensors==0){
-            ROS_WARN("there haven't been recorded any samples for one sensor, aborting");
-            return;
-        }
-        origin/=(double)active_sensors;
-        for (auto &sensor : pose_correction_sensors) {
-            if (number_of_samples[sensor] > 0) {
-                Vector3d rel;
-                rel = mean[sensor] - origin;
-                sensors[sensor].setRelativeLocation(rel);
-                ROS_INFO_STREAM("origin(" << origin[0] << ", " << origin[1] << ", " << origin[2] << ")");
-                publishSphere(mean[sensor], "world", "mean", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
-                publishRay(origin, rel, "world", "relative", message_counter++, COLOR(1, 1, 0, 1.0));
-            }
+    }
+    if(active_sensors==0){
+        ROS_WARN("no active sensors, aborting");
+        return;
+    }
+    origin/=(double)active_sensors;
+    if(origin.hasNaN()) {
+        ROS_WARN("origin not finite, aborting");
+        return;
+    }
+    publishSphere(origin, "world", "origin", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
+    for (auto &sensor : sensors) {
+        if (sensor_accepted[sensor.first]) {
+            Vector3d rel;
+            rel = mean[sensor.first] - origin;
+            sensor.second.setRelativeLocation(rel);
+            ROS_INFO_STREAM("origin(" << origin[0] << ", " << origin[1] << ", " << origin[2] << ")");
+            publishSphere(mean[sensor.first], "world", "mean", message_counter++, COLOR(0, 0, 1, 1.0), 0.01f);
+            publishRay(origin, rel, "world", "relative", message_counter++, COLOR(1, 1, 0, 1.0));
         }
     }
     writeConfig(path + "/protoType3.yaml");
@@ -784,15 +752,11 @@ bool TrackedObject::writeConfig(string filepath) {
     config["name"] = name;
     config["mesh"] = mesh;
     for (auto &sensor : sensors) {
-        if(!pose_correction_sensors.empty())
-            if(std::find(pose_correction_sensors.begin(), pose_correction_sensors.end(), sensor.first)==pose_correction_sensors.end())
-                continue; // we ignore the sensors that should not be used for pose correction
+        if(!sensor.second.sensorCalibrated())
+            continue;
         YAML::Node node = YAML::Load("[0, 0, 0, 0]");
         Vector3d relative_location;
         sensor.second.getRelativeLocation(relative_location);
-        if(relative_location.norm()>10000) // we skip sensor values that are not finite
-            continue;
-        cout << relative_location << endl;
         // first number is the sensor id
         node[0] = sensor.first;
         for (int i = 1; i <= 3; i++) {
@@ -800,11 +764,6 @@ bool TrackedObject::writeConfig(string filepath) {
         }
         config["sensor_relative_locations"].push_back(node);
     }
-    YAML::Node node = YAML::Load("[]");
-    for(int sensor:pose_correction_sensors){
-        node.push_back(sensor);
-    }
-    config["pose_correction_sensors"] = node;
 
     fout << config;
     return true;
