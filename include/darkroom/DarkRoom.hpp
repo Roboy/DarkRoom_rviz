@@ -38,6 +38,8 @@
 #include "darkroom/TrackedObject.hpp"
 #include "darkroom/UDPSocket.hpp"
 
+#include <roboy_communication_middleware/LighthousePoseCorrection.h>
+
 #endif
 
 using namespace std;
@@ -111,6 +113,8 @@ public Q_SLOTS:
      */
     void estimatePose();
 
+    void estimatePose2();
+
     void pingThread();
 
     void switch_lighthouses();
@@ -132,6 +136,8 @@ private:
      */
     void objectListener();
 
+    void correctPose(const roboy_communication_middleware::LighthousePoseCorrection &msg);
+
     /**
      * This functions looks through trackedObjects ListWidget if the object is already being tracked
      * @param IP IP of new object
@@ -145,6 +151,7 @@ private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;
     ros::Publisher visualization_pub;
+    ros::Subscriber pose_correction_sub;
     tf::TransformListener tf_listener;
     tf::TransformBroadcaster tf_broadcaster;
     tf::Transform lighthouse1, lighthouse2, tf_world;

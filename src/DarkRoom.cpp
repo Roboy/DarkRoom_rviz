@@ -88,6 +88,10 @@ DarkRoom::DarkRoom(QWidget *parent)
     connect(estimatePose_button, SIGNAL(clicked()), this, SLOT(estimatePose()));
     connectWidget->layout()->addWidget(estimatePose_button);
 
+    QPushButton *estimatePose2_button = new QPushButton(tr("estimatePose2"));
+    connect(estimatePose2_button, SIGNAL(clicked()), this, SLOT(estimatePose2()));
+    connectWidget->layout()->addWidget(estimatePose2_button);
+
     QPushButton *clearall_button = new QPushButton(tr("clear all"));
     connect(clearall_button, SIGNAL(clicked()), this, SLOT(clearAll()));
     connectWidget->layout()->addWidget(clearall_button);
@@ -150,6 +154,8 @@ DarkRoom::DarkRoom(QWidget *parent)
 
     visualization_pub = nh->advertise<visualization_msgs::Marker>("visualization_marker", 100);
 
+    pose_correction_sub = nh->subscribe("/roboy/middleware/DarkRoom/LighthousePoseCorrection",1,&DarkRoom::correctPose, this);
+
     resetLighthousePoses();
 
     TrackedObjectPtr newObject = TrackedObjectPtr(new TrackedObject());
@@ -160,6 +166,8 @@ DarkRoom::DarkRoom(QWidget *parent)
     item->setText("Roboy");
     this->findChild<QListWidget *>("trackedObjects")->addItem(item);
     ROS_INFO_STREAM("added Roboy");
+
+    trackIT->click();
 }
 
 DarkRoom::~DarkRoom() {
@@ -263,14 +271,14 @@ void DarkRoom::resetLighthousePoses(){
     QLineEdit *w = this->findChild<QLineEdit *>("lighthouse_distance");
     float ligthouse_distance = atof(w->text().toStdString().c_str());
 
-    tf_world.setOrigin(tf::Vector3(0, 0, 1.8));
+    tf_world.setOrigin(tf::Vector3(0, 0, 0));
     tf::Quaternion quat;
-    quat.setRPY(M_PI / 2, 0, 0);
+    quat.setRPY(0, 0, 0);
     tf_world.setRotation(quat);
-    quat.setRPY(0, M_PI / 2 + M_PI, 0);
+    quat.setRPY(0, -M_PI/2.0, 0);
     lighthouse1.setOrigin(tf::Vector3(0, 0, 0));
     lighthouse1.setRotation(quat);
-    quat.setRPY(0, M_PI / 2, 0);
+    quat.setRPY(0, M_PI/2.0, 0);
     lighthouse2.setOrigin(tf::Vector3(ligthouse_distance, 0, 0));
     lighthouse2.setRotation(quat);
 }
@@ -330,6 +338,12 @@ void DarkRoom::estimatePose() {
     }
 }
 
+void DarkRoom::estimatePose2() {
+    for(auto const &object:trackedObjects){
+        object.second->startPoseestimation(true);
+    }
+}
+
 void DarkRoom::switch_lighthouses(){
     lighthouse_switch=!lighthouse_switch;
     for(auto const &object:trackedObjects){
@@ -340,9 +354,13 @@ void DarkRoom::switch_lighthouses(){
 void DarkRoom::transformPublisher(){
     ros::Rate rate(5);
     while(publish_transform){
-        tf_broadcaster.sendTransform(tf::StampedTransform(lighthouse1,ros::Time::now(),"world_vive","lighthouse1"));
-        tf_broadcaster.sendTransform(tf::StampedTransform(lighthouse2,ros::Time::now(),"world_vive","lighthouse2"));
-        tf_broadcaster.sendTransform(tf::StampedTransform(tf_world, ros::Time::now(), "world", "world_vive"));
+        tf_broadcaster.sendTransform(tf::StampedTransform(lighthouse1,ros::Time::now(),"world","lighthouse1"));
+        tf_broadcaster.sendTransform(tf::StampedTransform(lighthouse2,ros::Time::now(),"world","lighthouse2"));
+//        tf::Matrix3x3 rot(lighthouse2.getRotation());
+//
+//        ROS_INFO_STREAM("rot: \n" << rot.getRow(0).getX() << "\t" << rot.getRow(0).getY() << "\t" << rot.getRow(0).getZ() << endl <<
+//                                rot.getRow(1).getX() << "\t" << rot.getRow(1).getY() << "\t" << rot.getRow(1).getZ() << endl <<
+//                                rot.getRow(2).getX() << "\t" << rot.getRow(2).getY() << "\t" << rot.getRow(2).getZ() << endl);
         rate.sleep();
     }
 }
@@ -390,6 +408,16 @@ void DarkRoom::objectListener(){
         rate.sleep();
     }
     ping_socket.reset();
+}
+
+void DarkRoom::correctPose(const roboy_communication_middleware::LighthousePoseCorrection &msg){
+    tf::Transform tf;
+    tf::transformMsgToTF(msg.tf, tf);
+    if(msg.id == 0){
+        lighthouse1 = tf*lighthouse1;
+    }else{
+        lighthouse2 = tf*lighthouse2;
+    }
 }
 
 bool DarkRoom::checkIfObjectAlreadyExists(const string &IP){

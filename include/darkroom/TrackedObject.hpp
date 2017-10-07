@@ -10,17 +10,12 @@
 #include <tf/transform_broadcaster.h>
 #include <tf_conversions/tf_eigen.h>
 #include <roboy_communication_middleware/DarkRoom.h>
+#include <roboy_communication_middleware/LighthousePoseCorrection.h>
 
 // Eigen
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
-#include <unsupported/Eigen/NonLinearOptimization>
-#include <unsupported/Eigen/NumericalDiff>
-
-// mavmap
-#include "base3d/triangulation.h"
-#include "base3d/projection.h"
 
 // std
 #include <map>
@@ -36,6 +31,9 @@
 #include "darkroom/UDPSocket.hpp"
 #include "darkroom/Sensor.hpp"
 #include "darkroom/PoseMinimizer.hpp"
+#include "darkroom/LighthousePoseMinimizer.hpp"
+#include "darkroom/LighthousePoseMinimizer2.hpp"
+#include "darkroom/Triangulation.hpp"
 
 #include <common_utilities/rviz_visualization.hpp>
 
@@ -47,7 +45,9 @@
 #define uSecsToRadians(ticks) (degreesToRadians(ticks * 0.0216))
 #define ticksToRadians(ticks) (degreesToRadians(ticks * 0.0216 / 50.0))
 #define MAX_ITERATIONS 100
-#define ERROR_THRESHOLD 0.0001
+#define ERROR_THRESHOLD 0.000000001
+
+#define NUMBER_OF_SAMPLES 100
 //#define DEBUG
 // #define KALMAN
 
@@ -61,7 +61,7 @@ using namespace std;
 
 static vector<int> DEFAULT_VECTOR;
 
-class TrackedObject:public rviz_visualization {
+class TrackedObject : public rviz_visualization {
 public:
     TrackedObject();
 
@@ -76,7 +76,7 @@ public:
      * @param configure if true sends our ports to client and waits for a logging message
      * @return success (if configure is false, this returns true even if there is no data coming from clientbool lighthouse)
      */
-    bool connectWifi(const char *IP, int sensor_port, int command_port, int logging_port, bool configure=true);
+    bool connectWifi(const char *IP, int sensor_port, int command_port, int logging_port, bool configure = true);
 
     /**
      * This function initializes a subscriber for roboy darkroom
@@ -84,6 +84,7 @@ public:
     void connectRoboy();
 
     void startReceiveData(bool start);
+
     /**
      * toggles tracking (starts reception of sensor data and triangulation threads)
      * @param start toggle flag
@@ -95,6 +96,12 @@ public:
      * @param start bool
      */
     void startCalibration(bool start);
+
+    /**
+     * Toggles poseestimation thread
+     * @param start bool
+     */
+    void startPoseestimation(bool start);
 
     /**
      * Toggles visualization of ligthhouse rays
@@ -123,6 +130,9 @@ public:
      * @return success
      */
     bool poseEstimation(tf::Transform &tf);
+
+    bool poseEstimation2();
+    bool poseEstimation3();
 
     /**
      * Triggers recording of sensor data to a sensor.log file
@@ -171,6 +181,7 @@ private:
      * Continuesly receiving, decoding and updating the sensor data
      */
     void receiveSensorData();
+
     /**
      * Continuesly receiving, decoding and updating the sensor data
      */
@@ -199,19 +210,6 @@ private:
     void publishRelativeFrame();
 
     /**
-    * This function triangulates the position of a sensor using the horizontal and vertical angles from two ligthouses
-    * via planes
-    * @param angles0 vertical/horizontal angles form first lighthouse
-    * @param angles1 vertical/horizontal angles form second lighthouse
-    * @param triangulated_position the triangulated position
-    * @param ray0 ligthhouse ray
-    * @param ray1 ligthhouse ray
-    * @return success (this can fail, if we don't get the pose of the lighthouses via tf)
-    */
-    bool triangulateFromLighthousePlanes(Vector2d &angles0, Vector2d &angles1, Vector3d &triangulated_position,
-                                         Vector3d &ray0, Vector3d &ray1);
-
-    /**
      * Queries the tf listener for the specified transform
      * @param from we whant the transformation from this frame
      * @param to another frame
@@ -233,12 +231,13 @@ private:
      * @return a unique id
      */
     int getMessageID(int type, int sensor, bool lighthouse = false);
+
 public:
     vector<int> calibrated_sensors;
 private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;
-    ros::Publisher visualization_pub, sensor_location_pub;
+    ros::Publisher visualization_pub, sensor_location_pub, lighthouse_pose_correction;
     ros::Subscriber sensor_sub;
     tf::Transform relativeFrame;
     tf::TransformListener tf_listener;
@@ -248,20 +247,20 @@ private:
     string name = "bastiisdoff";
     string mesh = "pimmel";
     vector<Eigen::Vector3f> object;
-    double axis_offset = -0.015;
     Vector3d poseIMU;
     int sensordata_port;
     UDPSocketPtr sensor_socket, command_socket, logging_socket, imu_socket;
-    boost::shared_ptr<thread> sensor_thread = nullptr, tracking_thread = nullptr, calibrate_thread = nullptr, imu_thread = nullptr;
+    boost::shared_ptr<thread> sensor_thread = nullptr, tracking_thread = nullptr, calibrate_thread = nullptr,
+            imu_thread = nullptr, poseestimation_thread = nullptr;
     bool receiveData = false, tracking = false, calibrating = false, connected = false, rays = false, recording = false,
-            publishingRelativeFrame = false;
-    map<int,Sensor> sensors;
+            publishingRelativeFrame = false, poseestimating = false;
+    map<int, Sensor> sensors;
     Vector3d origin;
     Vector4d pose;
     Vector4d zero_pose;
     bool m_switch = false;
     ofstream file;
-    enum MESSAGE_ID{
+    enum MESSAGE_ID {
         TRIANGULATED = 0,      // for each sensor
         DISTANCE = 1,           // for each sensor and lighthouse
         RAY = 2,   // for each sensor and lighthouse
