@@ -275,11 +275,11 @@ void DarkRoom::resetLighthousePoses(){
     tf::Quaternion quat;
     quat.setRPY(0, 0, 0);
     tf_world.setRotation(quat);
-    quat.setRPY(0, -M_PI/2.0, 0);
+    quat.setRPY(0, 0, 0);
     lighthouse1.setOrigin(tf::Vector3(0, 0, 0));
     lighthouse1.setRotation(quat);
-    quat.setRPY(0, M_PI/2.0, 0);
-    lighthouse2.setOrigin(tf::Vector3(ligthouse_distance, 0, 0));
+    quat.setRPY(M_PI, M_PI, 0);
+    lighthouse2.setOrigin(tf::Vector3(0, -ligthouse_distance, 0));
     lighthouse2.setRotation(quat);
 }
 

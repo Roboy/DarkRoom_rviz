@@ -17,6 +17,10 @@ TrackedObject::TrackedObject() {
     lighthouse_pose_correction = nh->advertise<roboy_communication_middleware::LighthousePoseCorrection>(
             "/roboy/middleware/DarkRoom/LighthousePoseCorrection", 1);
 
+    spinner = boost::shared_ptr<ros::AsyncSpinner>(new ros::AsyncSpinner(1));
+    spinner->start();
+
+
     if (const char *env_p = getenv("DARKROOM_CALIBRATED_OBJECTS")) {
         path = env_p;
         ROS_INFO_STREAM("using DARKROOM_CALIBRATED_OBJECTS: " << path);
@@ -213,6 +217,9 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
     vector<double> elevations, azimuths;
     vector<double> distanceToLighthouse;
     vector<int> ids;
+//    if(lighthouse){
+//        map_lighthouse_id(true);
+//    }
     if (specificIds.empty()) {
         // let's see who is active
         for (auto &sensor : sensors) {
@@ -250,10 +257,18 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
         for (uint i = 0; i < specificIds.size(); i++) {
             ids.push_back(specificIds.at(i));
             sensors[specificIds.at(i)].get(lighthouse, elevations, azimuths);
+//            Vector3d pos;
+//            sensors[specificIds.at(i)].getPosition3D(pos);
+//            relPos.push_back(pos);
             sensors[specificIds.at(i)].getRelativeLocation(relPos);
             distanceToLighthouse.push_back(sensors[specificIds.at(i)].getDistance(lighthouse));
         }
     }
+
+//    if(!lighthouse){
+//        map_lighthouse_id(false);
+//    }
+
     if (ids.size() < 3)
         return false;
     // cost function
@@ -267,10 +282,22 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
     for (uint i = 0; i < ids.size() - 1; i++) {
         for (uint j = i + 1; j < ids.size(); j++) {
             // calculate the cosine between the two sensors
+
             cosineBetween(i, j) =
                     sin(elevations[i]) * cos(azimuths[i]) * sin(elevations[j]) * cos(azimuths[j]) +
                     sin(elevations[i]) * sin(azimuths[i]) * sin(elevations[j]) * sin(azimuths[j]) +
                     cos(elevations[i]) * cos(elevations[j]);
+
+//            Vector3d ray0, ray1;
+//            Vector2d angles0, angles1;
+//            sensors[specificIds.at(i)].get(lighthouse, angles0);
+//            sensors[specificIds.at(j)].get(lighthouse, angles1);
+//            rayFromLighthouseAngles(angles0, ray0);
+//            rayFromLighthouseAngles(angles1, ray1);
+//            cosineBetween(i, j) = ray0.dot(ray1);
+
+            ROS_INFO("cosine between %d and %d: %f", i,j,cosineBetween(i, j));
+//            ROS_INFO("second method cosine between %d and %d: %f", i,j,ray0.dot(ray1));
             // calculate the distance between the sensors
             distanceBetween(i, j) = (relPos[i] - relPos[j]).norm();
             ROS_INFO("distance between sensor %d and %d: %f", ids[i], ids[j], distanceBetween(i, j));
@@ -349,6 +376,29 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
         Vector3d pos(0, 0, 0);
         publishRay(pos, relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
                    getMessageID(RAY, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.3), 100);
+
+        sprintf(str, "%d", id);
+        publishText(relLocation, str, (lighthouse ? "lighthouse2" : "lighthouse1"), "sensor_id", rand(),
+                    COLOR(1, 0, 0, 0.5), 0, 0.04f);
+    }
+    for (auto id:ids) {
+        for (auto id2:ids) {
+            if (id2 != id) {
+                Vector3d pos1, pos2, dir;
+                sensors[id].get(lighthouse,pos1);
+                sensors[id2].get(lighthouse,pos2);
+                dir = pos2 - pos1;
+                publishRay(pos1, dir, (lighthouse?"lighthouse2":"lighthouse1"), "distance",
+                           rand(), COLOR(0, 1, 1, 0.1));
+
+                char str[100];
+                sprintf(str, "%.3f", dir.norm());
+                Vector3d pos = pos1 + dir / 2.0;
+                publishText(pos, str, (lighthouse?"lighthouse2":"lighthouse1"), "distance", rand(),
+                            COLOR(1, 0, 0, 0.5), 0, 0.02f);
+
+            }
+        }
     }
 
 //    if (iterations >= MAX_ITERATIONS || error >= ERROR_THRESHOLD) {
