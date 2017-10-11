@@ -72,6 +72,11 @@ DarkRoom::DarkRoom(QWidget *parent)
     connect(rays, SIGNAL(clicked()), this, SLOT(showRays()));
     connectWidget->layout()->addWidget(rays);
 
+    QCheckBox *distances = new QCheckBox(tr("distances"));
+    distances->setObjectName("distances");
+    connect(distances, SIGNAL(clicked()), this, SLOT(showDistances()));
+    connectWidget->layout()->addWidget(distances);
+
     QPushButton *switch_lighthouses_button = new QPushButton(tr("switch lighthouses"));
     connect(switch_lighthouses_button, SIGNAL(clicked()), this, SLOT(switch_lighthouses()));
     connectWidget->layout()->addWidget(switch_lighthouses_button);
@@ -278,8 +283,8 @@ void DarkRoom::resetLighthousePoses(){
     quat.setRPY(0, 0, 0);
     lighthouse1.setOrigin(tf::Vector3(0, 0, 0));
     lighthouse1.setRotation(quat);
-    quat.setRPY(M_PI, M_PI, 0);
-    lighthouse2.setOrigin(tf::Vector3(0, -ligthouse_distance, 0));
+    quat.setRPY(0, 0, 0);
+    lighthouse2.setOrigin(tf::Vector3(ligthouse_distance, 0, 0));
     lighthouse2.setRotation(quat);
 }
 
@@ -312,6 +317,13 @@ void DarkRoom::showRays(){
     QCheckBox *w = this->findChild<QCheckBox *>("rays");
     for(auto const &object:trackedObjects){
         object.second->showRays(w->isChecked());
+    }
+}
+
+void DarkRoom::showDistances(){
+    QCheckBox *w = this->findChild<QCheckBox *>("distances");
+    for(auto const &object:trackedObjects){
+        object.second->showDistances(w->isChecked());
     }
 }
 

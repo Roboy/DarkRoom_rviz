@@ -34,6 +34,7 @@
 #include "darkroom/LighthousePoseMinimizer.hpp"
 #include "darkroom/LighthousePoseMinimizer2.hpp"
 #include "darkroom/Triangulation.hpp"
+#include "epnp/epnp.h"
 
 #include <common_utilities/rviz_visualization.hpp>
 
@@ -42,9 +43,9 @@
 // Converts radians to degrees.
 #define radiansToDegrees(angleRadians) (angleRadians * 180.0 / M_PI)
 
-#define uSecsToRadians(ticks) (degreesToRadians(ticks * 0.0216))
-#define ticksToRadians(ticks) (degreesToRadians(ticks * 0.0216 / 50.0))
-#define MAX_ITERATIONS 100
+#define uSecsToRadians(ticks) (degreesToRadians(ticks * 0.021600864))
+#define ticksToRadians(ticks) (degreesToRadians(ticks * 0.021600864 / 50.0))
+#define MAX_ITERATIONS 1000
 #define ERROR_THRESHOLD 0.000000001
 
 #define NUMBER_OF_SAMPLES 100
@@ -110,6 +111,12 @@ public:
     void showRays(bool show);
 
     /**
+     * Toggles visualization of relative sensor distances
+     * @param show bool
+     */
+    void showDistances(bool show);
+
+    /**
      * This function  switches the lighthouse ids for all objects
      */
     void map_lighthouse_id(bool switchID);
@@ -133,6 +140,7 @@ public:
 
     bool poseEstimation2();
     bool poseEstimation3();
+    bool poseEstimation4();
 
     /**
      * Triggers recording of sensor data to a sensor.log file
@@ -253,7 +261,7 @@ private:
     boost::shared_ptr<thread> sensor_thread = nullptr, tracking_thread = nullptr, calibrate_thread = nullptr,
             imu_thread = nullptr, poseestimation_thread = nullptr;
     bool receiveData = false, tracking = false, calibrating = false, connected = false, rays = false, recording = false,
-            publishingRelativeFrame = false, poseestimating = false;
+            publishingRelativeFrame = false, poseestimating = false, distances = false;
     map<int, Sensor> sensors;
     Vector3d origin;
     Vector4d pose;

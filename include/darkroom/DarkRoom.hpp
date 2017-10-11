@@ -99,6 +99,11 @@ public Q_SLOTS:
     void showRays();
 
     /**
+     * Toggles visualization of relative sensor distances
+     */
+    void showDistances();
+
+    /**
      * Toggles calibration
      */
     void calibrate();

@@ -1,8 +1,8 @@
 #include "darkroom/Sensor.hpp"
 
 Sensor::Sensor(){
-    m_relativePosition3D[0] = Vector3d(0,0,-1);
-    m_relativePosition3D[1] = Vector3d(0,0,-1);
+    m_relativePosition3D[0] = Vector3d(0,1,0);
+    m_relativePosition3D[1] = Vector3d(0,1,0);
 }
 
 void Sensor::update(bool lighthouse, int type, unsigned short timestamp, double angle){
@@ -10,7 +10,7 @@ void Sensor::update(bool lighthouse, int type, unsigned short timestamp, double 
     if (type == HORIZONTAL) {
         m_angles_horizontal[lighthouse] = make_pair(timestamp, angle);
     } else {
-        m_angles_vertical[lighthouse] = make_pair(timestamp, angle);
+        m_angles_vertical[lighthouse] = make_pair(timestamp, M_PI-angle);
     }
     m_angleUpdateTime[lighthouse] = ros::Time::now();
 }

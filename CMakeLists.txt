@@ -42,7 +42,6 @@ catkin_package(CATKIN_DEPENDS message_runtime roboy_communication_middleware com
 include_directories(
 		include/
         mavmap/src
-        epnp/
         ${catkin_INCLUDE_DIRS}
 		${Qt5Widgets_INCLUDE_DIRS}
 		${Qt5Core_INCLUDE_DIRS}
@@ -64,7 +63,7 @@ target_link_libraries( PoseMinimizer ${catkin_LIBRARIES} )
 add_library( Sensor src/Sensor.cpp )
 target_link_libraries( Sensor ${catkin_LIBRARIES} )
 
-add_library( TrackedObject src/TrackedObject.cpp mavmap/src/base3d/triangulation.cc mavmap/src/base3d/projection.cc )
+add_library( TrackedObject src/TrackedObject.cpp mavmap/src/base3d/triangulation.cc mavmap/src/base3d/projection.cc epnp/epnp.cpp)
 add_dependencies(TrackedObject roboy_communication_simulation_gencpp)
 target_link_libraries( TrackedObject ${yaml-cpp_LIBRARIES} ${catkin_LIBRARIES} ${OpenCV_LIBS} UDPSocket PoseMinimizer Sensor )
 
