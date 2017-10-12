@@ -63,15 +63,16 @@ target_link_libraries( PoseMinimizer ${catkin_LIBRARIES} )
 add_library( Sensor src/Sensor.cpp )
 target_link_libraries( Sensor ${catkin_LIBRARIES} )
 
-add_library( TrackedObject src/TrackedObject.cpp mavmap/src/base3d/triangulation.cc mavmap/src/base3d/projection.cc epnp/epnp.cpp)
+add_library( TrackedObject src/TrackedObject.cpp mavmap/src/base3d/triangulation.cc mavmap/src/base3d/projection.cc
+		epnp/epnp.cpp mavmap/src/base3d/p3p.cc mavmap/src/util/math.cc src/ParticleFilter.cpp)
 add_dependencies(TrackedObject roboy_communication_simulation_gencpp)
 target_link_libraries( TrackedObject ${yaml-cpp_LIBRARIES} ${catkin_LIBRARIES} ${OpenCV_LIBS} UDPSocket PoseMinimizer Sensor )
 
 qt5_wrap_cpp(MOC_FILES include/darkroom/DarkRoom.hpp include/darkroom/TrackedObjectDelegate.hpp)
-add_library( darkroom src/DarkRoom.cpp src/TrackedObjectDelegate.cpp ${MOC_FILES} src/Triangulation.cpp)
+add_library( darkroom src/DarkRoom.cpp src/TrackedObjectDelegate.cpp ${MOC_FILES} src/Triangulation.cpp src/ParticleFilter.cpp)
 target_link_libraries( darkroom ${QT_LIBRARIES} ${catkin_LIBRARIES} TrackedObject rviz_visualization)
 
-add_executable( CommunicationTest src/CommunicationTest.cpp include/darkroom/Triangulation.hpp)
+add_executable( CommunicationTest src/CommunicationTest.cpp)
 target_link_libraries( CommunicationTest ${catkin_LIBRARIES} UDPSocket )
 
 #==============================================================================

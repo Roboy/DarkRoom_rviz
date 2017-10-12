@@ -38,7 +38,6 @@ double triangulateFromLighthousePlanes(Vector2d &angles0, Vector2d &angles1, Mat
                                      Vector3d &triangulated_position, Vector3d &ray0, Vector3d &ray1) {
     ;
 
-    // generate the projection matrices
     Matrix3d rot0, rot1;
     rot0 = RT_0.topLeftCorner(3, 3);
     rot1 = RT_1.topLeftCorner(3, 3);
@@ -81,39 +80,26 @@ double triangulateFromLighthousePlanes(Vector2d &angles0, Vector2d &angles1, Mat
     return distance;
 }
 
-void
-triangulateFromRays(Vector3d &ray0, Vector3d &ray1, Matrix4d &RT_0, Matrix4d &RT_1, Vector3d &triangulated_position) {
-    // generate the projection matrices
-    Eigen::Matrix<double, 3, 4> proj_matrix0, proj_matrix1;
-    proj_matrix0 = RT_0.topLeftCorner(3, 4);
-    proj_matrix1 = RT_1.topLeftCorner(3, 4);
-    // project onto image plane
-    Eigen::Vector2d projected_image_location0 = Eigen::Vector2d(ray0(0) / ray0(1), ray0(2) / ray0(1));
-    Eigen::Vector2d projected_image_location1 = Eigen::Vector2d(ray1(0) / ray1(1), ray1(2) / ray1(1));
+double triangulateFromRays(Vector3d &ray0, Vector3d &ray1,
+                           Matrix4d &RT_0, Matrix4d &RT_1,
+                           Vector3d &triangulated_position) {
+    Matrix3d rot0, rot1;
+    rot0 = RT_0.topLeftCorner(3, 3);
+    rot1 = RT_1.topLeftCorner(3, 3);
 
-    triangulated_position = triangulate_point(proj_matrix0, proj_matrix1,
-                                              projected_image_location0, projected_image_location1);
-}
+    Vector3d ray0_worldFrame, ray1_worldFrame;
 
-void
-triangulateFromRays(MatrixXd &ray0, MatrixXd &ray1, Matrix4d &RT_0, Matrix4d &RT_1, MatrixXd &triangulated_position) {
-    // generate the projection matrices
-    Eigen::Matrix<double, 3, 4> proj_matrix0, proj_matrix1;
-    proj_matrix0 = RT_0.topLeftCorner(3, 4);
-    proj_matrix1 = RT_1.topLeftCorner(3, 4);
+    ray0_worldFrame = rot0*ray0;
+    ray1_worldFrame = rot1*ray1;
 
-    for (int i = 0; i < ray0.cols(); i++) {
-        // project onto image plane
-        Eigen::Vector2d projected_image_location0 = Eigen::Vector2d(ray0(0, i) / ray0(1, i), ray0(2, i) / ray0(1, i));
-        Eigen::Vector2d projected_image_location1 = Eigen::Vector2d(ray1(0, i) / ray1(1, i), ray1(2, i) / ray1(1, i));
+    Vector3d origin0 = RT_0.topRightCorner(3,1), origin1 = RT_1.topRightCorner(3,1);
 
-        Vector3d pos = triangulate_point(proj_matrix0, proj_matrix1,
-                                         projected_image_location0, projected_image_location1);
+    Vector3d l0, l1;
 
-        triangulated_position(0, i) = pos(0);
-        triangulated_position(1, i) = pos(1);
-        triangulated_position(2, i) = pos(2);
-    }
+    double distance = dist3D_Line_to_Line(origin0, ray0_worldFrame, origin1, ray1_worldFrame, l0, l1);
+    triangulated_position = l0+origin0 + (l1+origin1-l0-origin0)/2.0;
+
+    return distance;
 }
 
 void rayFromLighthouseAngles(Vector2d &angles, Vector3d &ray) {

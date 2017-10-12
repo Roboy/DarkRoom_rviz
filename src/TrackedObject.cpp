@@ -199,6 +199,23 @@ void TrackedObject::startPoseestimation(bool start) {
     }
 }
 
+void TrackedObject::startParticleFilter(bool start) {
+    if (start) {
+        ROS_INFO("starting particle filter thread");
+        particle_filtering = true;
+        particlefilter_thread = boost::shared_ptr<thread>(new thread(&TrackedObject::particleFilter, this));
+        particlefilter_thread->detach();
+    } else {
+        if (particlefilter_thread != nullptr) {
+            particle_filtering = false;
+            if (particlefilter_thread->joinable()) {
+                ROS_INFO("Waiting for particle filter thread to terminate");
+                particlefilter_thread->join();
+            }
+        }
+    }
+}
+
 void TrackedObject::showRays(bool show) {
     rays = show;
 }
@@ -305,7 +322,7 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
         for (uint i = 0; i < ids.size(); i++) {
             d_old(i) = distanceToLighthouse[i];
         }
-        if(iterations%100==0){
+        if (iterations % 100 == 0) {
 //            ROS_INFO_STREAM("J\n" << J);
 //            ROS_INFO_STREAM("v\n" << v);
 //            ROS_INFO_STREAM("d_old\n" << d_old);
@@ -330,7 +347,7 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
 
         Vector2d angles(azimuths[i], elevations[i]);
         Eigen::Vector3d u0;
-        rayFromLighthouseAngles(angles,u0);
+        rayFromLighthouseAngles(angles, u0);
 
         Vector3d relLocation(d_old(i) * u0(0), d_old(i) * u0(1), d_old(i) * u0(2));
         sensors[id].set(lighthouse, relLocation);
@@ -363,7 +380,7 @@ bool TrackedObject::distanceEstimation(bool lighthouse, vector<int> &specificIds
                 publishRay(pos1, dir, (lighthouse ? "lighthouse2" : "lighthouse1"), "distance",
                            rand(), COLOR(0, 1, lighthouse ? 0 : 1, 0.5));
 
-                if(distances){
+                if (distances) {
                     char str[100];
                     sprintf(str, "%.3f", dir.norm());
                     Vector3d pos = pos1 + dir / 2.0;
@@ -699,13 +716,13 @@ bool TrackedObject::poseEstimation4() {
     PnP.reset_correspondences();
     PnP.set_internal_parameters(0, 0, 1, 1);
     PnP.set_maximum_number_of_correspondences(calibrated_sensors.size());
-    for(uint id:calibrated_sensors){
+    for (uint id:calibrated_sensors) {
         Vector3d pos, ray;
         Vector2d angles;
-        sensors[id].get(0,pos);
-        sensors[id].get(0,angles);
-        rayFromLighthouseAngles(angles,ray);
-        PnP.add_correspondence(pos(0),pos(2),-pos(1),ray(0)/ray(1), ray(2)/ray(1));
+        sensors[id].get(0, pos);
+        sensors[id].get(0, angles);
+        rayFromLighthouseAngles(angles, ray);
+        PnP.add_correspondence(pos(0), pos(1), pos(2), ray(0) / ray(1), ray(2) / ray(1));
     }
 
     double R_est[3][3], t_est[3];
@@ -717,9 +734,196 @@ bool TrackedObject::poseEstimation4() {
 
     tf::Transform tf;
     tf.setOrigin(tf::Vector3(t_est[0], t_est[1], t_est[2]));
-    tf.setRotation(tf::Quaternion(1,0,0,0));
-    tf_broadcaster.sendTransform(tf::StampedTransform(tf,ros::Time::now(),"lighthouse1","object"));
+    tf.setRotation(tf::Quaternion(1, 0, 0, 0));
+    tf_broadcaster.sendTransform(tf::StampedTransform(tf, ros::Time::now(), "lighthouse1", "object_epnp"));
 
+
+    P3PEstimator p3PEstimator;
+    std::vector<Eigen::MatrixXd> result;
+    MatrixXd points2d(calibrated_sensors.size(), 2), points3d(calibrated_sensors.size(), 3);
+    uint i = 0;
+    for (uint id:calibrated_sensors) {
+        Vector3d pos, ray;
+        Vector2d angles;
+        sensors[id].get(0, pos);
+        sensors[id].get(0, angles);
+        rayFromLighthouseAngles(angles, ray);
+        points2d(i, 0) = ray(0) / ray(1);
+        points2d(i, 1) = ray(2) / ray(1);
+        points3d(i, 0) = pos(0);
+        points3d(i, 1) = pos(1);
+        points3d(i, 2) = pos(2);
+    }
+    result = p3PEstimator.estimate(points2d, points3d);
+    tf::Transform tf2;
+    Vector3d position = result[0].topRightCorner(3, 1);
+    cout << "p3p: " << endl << result[0] << endl;
+    cout << "p3p position: " << endl << position << endl;
+    tf2.setOrigin(tf::Vector3(position(0), position(1), position(2)));
+    tf2.setRotation(tf::Quaternion(1, 0, 0, 0));
+    tf_broadcaster.sendTransform(tf::StampedTransform(tf2, ros::Time::now(), "world", "object_p3p"));
+}
+
+bool TrackedObject::particleFilter() {
+    Matrix4d RT_0;
+    if (!getTransform((!m_switch ? "lighthouse1" : "lighthouse2"), "world", RT_0))
+        return false;
+
+    vector<int> ids;
+    vector<Vector3d> rays0, rays1;
+    pair<Vector3d, Vector3d> origins;
+    origins.first = RT_0.topRightCorner(3, 1);
+    origins.second = Vector3d(0, 0, 0);
+    MatrixXd distances(calibrated_sensors.size(), calibrated_sensors.size());
+    for (auto &sensor:calibrated_sensors) {
+        if (sensors[sensor].isActive(0) && sensors[sensor].isActive(1)) {
+            ids.push_back(sensor);
+            Vector2d angles0, angles1;
+            Vector3d ray0, ray1;
+            sensors[sensor].get(0, angles0);
+            sensors[sensor].get(1, angles1);
+            rayFromLighthouseAngles(angles0, ray0);
+            rayFromLighthouseAngles(angles1, ray1);
+            ray0 = RT_0.topLeftCorner(3, 3) * ray0;
+            rays0.push_back(ray0);
+            rays1.push_back(ray1);
+        } else {
+            ROS_ERROR("sensor %d of the calibrated sensors is not visible, aborting", sensor);
+            return false;
+        }
+    }
+
+    int i = 0;
+    for (auto &sensor0:calibrated_sensors) {
+        int j = 0;
+        Vector3d rel0;
+        sensors[sensor0].getRelativeLocation(rel0);
+        for (auto &sensor1:calibrated_sensors) {
+            if (sensor0 != sensor1) {
+                Vector3d rel1;
+                sensors[sensor1].getRelativeLocation(rel1);
+                distances(i, j) = (rel0 - rel1).norm();
+            }
+            j++;
+        }
+        i++;
+    }
+
+    normal_distribution<double> distribution(0, 0.01);
+    default_random_engine generator;
+
+    ParticleFilter<VectorXd> pf(NUMBER_OF_PARTICLES, 6,
+                                [&pf, &distribution, &generator](int id) {
+                                    double dx = distribution(generator), dy = distribution(
+                                            generator), dz = distribution(generator);
+                                    double droll = distribution(generator), dpitch = distribution(
+                                            generator), dyaw = distribution(generator);
+                                    pf.particles[id](0) += dx;
+                                    pf.particles[id](1) += dy;
+                                    pf.particles[id](2) += dz;
+                                    pf.particles[id](3) += droll;
+                                    pf.particles[id](4) += dpitch;
+                                    pf.particles[id](5) += dyaw;
+                                },
+                                [this, &pf, &rays0, &rays1, &origins, &distances](int id) {
+                                    double distanceSensors = 0.0, distanceRays = 0.0;
+                                    vector<Vector3d> triangulated_positions;
+                                    Matrix4d RT = Matrix4d::Identity();
+                                    getRTmatrix(RT, pf.particles[id]);
+                                    for (uint sensor = 0; sensor < rays0.size(); sensor++) {
+                                        Vector3d new_origin = origins.first + RT.topRightCorner(3, 1);
+                                        Vector3d new_ray = RT.topLeftCorner(3, 3) * rays1[sensor];
+                                        Vector3d l0, l1;
+                                        distanceSensors += pow(
+                                                dist3D_Line_to_Line(origins.first, rays0[sensor], new_origin,
+                                                                    new_ray, l0, l1), 2.0);
+                                        triangulated_positions.push_back(
+                                                l0 + origins.first + (l1 + origins.second - l0 - origins.first) / 2.0);
+                                    }
+                                    distanceSensors = sqrt(distanceSensors);
+                                    for (uint i = 0; i < rays0.size(); i++) {
+                                        for (uint j = 0; j < rays1.size(); j++) {
+                                            if (i != j) {
+                                                double dist = distances(i, j);
+                                                double triangulated_dist = (triangulated_positions[i] -
+                                                                            triangulated_positions[j]).norm();
+                                                distanceRays += pow(triangulated_dist - dist, 2.0);
+                                            }
+                                        }
+                                    }
+                                    distanceRays = sqrt(distanceRays);
+
+                                    return (distanceRays + distanceSensors);
+                                },
+                                0, 1);
+    Matrix4d RT_1;
+    for (uint iter = 0; iter < 10000; iter++) {
+        pf.step();
+        if (iter % 10 == 0) {
+            ROS_INFO("particle iterations %d", iter);
+            for(uint i=0;i<NUMBER_OF_PARTICLES;i++) {
+                tf::Transform tf;
+                getTFtransform(pf.particles[i], tf);
+                char str[100];
+                sprintf(str, "%d", i);
+                tf_broadcaster.sendTransform(tf::StampedTransform(tf, ros::Time::now(), "world", str));
+            }
+        }
+    }
+
+    VectorXd winner;
+    int index;
+    double cost = pf.result(winner, &index);
+
+
+    getRTmatrix(RT_1, pf.particles[index]);
+    origins.second = RT_1.topRightCorner(3, 1);
+
+    double distanceBetweenRays = 0.0;
+    vector<Vector3d> triangulated_positions;
+    for (uint sensor = 0; sensor < rays0.size(); sensor++) {
+        Vector3d l0, l1;
+        rays1[sensor] = RT_1.topRightCorner(3, 3) * rays1[sensor];
+        distanceBetweenRays += pow(dist3D_Line_to_Line(origins.first, rays0[sensor], origins.second,
+                                                   rays1[sensor], l0, l1),2.0);
+        triangulated_positions.push_back(l0 + origins.first + (l1 + origins.second - l0 - origins.first) / 2.0);
+    }
+    distanceBetweenRays = sqrt(distanceBetweenRays);
+
+    double distanceBetweenSensors = 0.0;
+    for (uint i = 0; i < rays0.size(); i++) {
+        for (uint j = 0; j < rays1.size(); j++) {
+            if (i != j) {
+                double dist = distances(i, j);
+                double triangulated_dist = (triangulated_positions[i] - triangulated_positions[j]).norm();
+                distanceBetweenSensors += pow(triangulated_dist - dist,2.0);
+            }
+        }
+    }
+    distanceBetweenSensors = sqrt(distanceBetweenSensors);
+
+    ROS_INFO("particle filter terminated with %f cost and the winner is %d\n"
+                     "rot:\n"
+                     "%f\t%f\t%f\n"
+                     "%f\t%f\t%f\n"
+                     "%f\t%f\t%f\n"
+                     "trans: %f\t%f\t%f\n"
+                     "error rays %f\n"
+                     "error distance between sensors %f", cost, index,
+             RT_1(0, 0), RT_1(0, 1), RT_1(0, 2), RT_1(1, 0), RT_1(1, 1), RT_1(1, 2), RT_1(2, 0),
+             RT_1(2, 1), RT_1(2, 2), RT_1(0, 3), RT_1(1, 3), RT_1(2, 3), distanceBetweenRays, distanceBetweenSensors);
+
+
+    tf::Transform tf;
+    tf.setBasis(tf::Matrix3x3(RT_1(0, 0), RT_1(0, 1), RT_1(0, 2), RT_1(1, 0), RT_1(1, 1), RT_1(1, 2), RT_1(2, 0),
+                              RT_1(2, 1), RT_1(2, 2)));
+    tf.setOrigin(tf::Vector3(RT_1(0, 3), RT_1(1, 3), RT_1(2, 3)));
+
+    roboy_communication_middleware::LighthousePoseCorrection msg;
+    msg.id = 1;
+    msg.type = 1; // absolute correction
+    tf::transformTFToMsg(tf, msg.tf);
+    lighthouse_pose_correction.publish(msg);
 }
 
 bool TrackedObject::record(bool start) {
@@ -869,9 +1073,9 @@ void TrackedObject::trackSensors() {
         roboy_communication_middleware::DarkRoomSensor msg;
 
         Matrix4d RT_0, RT_1;
-        if (!getTransform((!m_switch?"lighthouse1":"lighthouse2"), "world",RT_0))
+        if (!getTransform((!m_switch ? "lighthouse1" : "lighthouse2"), "world", RT_0))
             continue;
-        if (!getTransform((!m_switch?"lighthouse2":"lighthouse1"),"world", RT_1))
+        if (!getTransform((!m_switch ? "lighthouse2" : "lighthouse1"), "world", RT_1))
             continue;
 
         for (auto &sensor : sensors) {
@@ -1190,4 +1394,36 @@ void TrackedObject::clearAll() {
 int TrackedObject::getMessageID(int type, int sensor, bool lighthouse) {
     return trackeObjectInstance * 5 * sensors.size() +
            type * (sensors.size() * NUMBER_OF_LIGHTHOUSES) + sensors.size() * lighthouse + sensor;
+}
+
+void TrackedObject::getRTmatrix(Matrix4d &RT, VectorXd &pose) {
+    RT = Matrix4d::Identity();
+    // construct quaternion (cf unit-sphere projection Terzakis paper)
+    double alpha_squared = pow(pow(pose(0), 2.0) + pow(pose(1), 2.0) + pow(pose(2), 2.0), 2.0);
+    Quaterniond q((1 - alpha_squared) / (alpha_squared + 1),
+                  2.0 * pose(0) / (alpha_squared + 1),
+                  2.0 * pose(1) / (alpha_squared + 1),
+                  2.0 * pose(2) / (alpha_squared + 1));
+    // construct RT matrix
+    RT.topLeftCorner(3, 3) = q.toRotationMatrix();
+    RT.topRightCorner(3, 1) << pose(3), pose(4), pose(5);
+}
+
+void TrackedObject::getTFtransform(VectorXd &x, tf::Transform &tf) {
+    tf.setOrigin(tf::Vector3(x(3), x(4), x(5)));
+
+// construct quaternion (cf unit-sphere projection Terzakis paper)
+    double alpha_squared = pow(pow(x(0), 2.0) + pow(x(1), 2.0) + pow(x(2), 2.0), 2.0);
+    Quaterniond q((1 - alpha_squared) / (alpha_squared + 1),
+                  2.0 * x(0) / (alpha_squared + 1),
+                  2.0 * x(1) / (alpha_squared + 1),
+                  2.0 * x(2) / (alpha_squared + 1));
+    Matrix3d rot = q.toRotationMatrix();
+    tf::Quaternion quat;
+    tf::Matrix3x3 rot_matrix(rot(0, 0), rot(0, 1), rot(0, 2),
+                             rot(1, 0), rot(1, 1), rot(1, 2),
+                             rot(2, 0), rot(2, 1), rot(2, 2));
+
+    rot_matrix.getRotation(quat);
+    tf.setRotation(quat);
 }

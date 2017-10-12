@@ -97,6 +97,10 @@ DarkRoom::DarkRoom(QWidget *parent)
     connect(estimatePose2_button, SIGNAL(clicked()), this, SLOT(estimatePose2()));
     connectWidget->layout()->addWidget(estimatePose2_button);
 
+    QPushButton *particle_filter = new QPushButton(tr("particle filter"));
+    connect(particle_filter, SIGNAL(clicked()), this, SLOT(particleFilter()));
+    connectWidget->layout()->addWidget(particle_filter);
+
     QPushButton *clearall_button = new QPushButton(tr("clear all"));
     connect(clearall_button, SIGNAL(clicked()), this, SLOT(clearAll()));
     connectWidget->layout()->addWidget(clearall_button);
@@ -356,6 +360,12 @@ void DarkRoom::estimatePose2() {
     }
 }
 
+void DarkRoom::particleFilter() {
+    for(auto const &object:trackedObjects){
+        object.second->startParticleFilter(true);
+    }
+}
+
 void DarkRoom::switch_lighthouses(){
     lighthouse_switch=!lighthouse_switch;
     for(auto const &object:trackedObjects){
@@ -426,9 +436,15 @@ void DarkRoom::correctPose(const roboy_communication_middleware::LighthousePoseC
     tf::Transform tf;
     tf::transformMsgToTF(msg.tf, tf);
     if(msg.id == 0){
-        lighthouse1 = tf*lighthouse1;
+        if(msg.type == 0)
+            lighthouse1 = tf*lighthouse1;
+        else
+            lighthouse1 = tf;
     }else{
-        lighthouse2 = tf*lighthouse2;
+        if(msg.type == 0)
+            lighthouse2 = tf*lighthouse2;
+        else
+            lighthouse2 = tf;
     }
 }
 

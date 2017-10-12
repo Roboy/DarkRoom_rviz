@@ -120,6 +120,8 @@ public Q_SLOTS:
 
     void estimatePose2();
 
+    void particleFilter();
+
     void pingThread();
 
     void switch_lighthouses();

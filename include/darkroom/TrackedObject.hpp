@@ -36,6 +36,10 @@
 #include "darkroom/Triangulation.hpp"
 #include "epnp/epnp.h"
 
+#include "darkroom/ParticleFilter.hpp"
+
+#include "mavmap/src/base3d/p3p.h"
+
 #include <common_utilities/rviz_visualization.hpp>
 
 // Converts degrees to radians.
@@ -49,6 +53,8 @@
 #define ERROR_THRESHOLD 0.000000001
 
 #define NUMBER_OF_SAMPLES 100
+
+#define NUMBER_OF_PARTICLES 1000
 //#define DEBUG
 // #define KALMAN
 
@@ -105,6 +111,12 @@ public:
     void startPoseestimation(bool start);
 
     /**
+     * Toggles particle filter thread for pose correction
+     * @param start bool
+     */
+    void startParticleFilter(bool start);
+
+    /**
      * Toggles visualization of ligthhouse rays
      * @param show bool
      */
@@ -141,6 +153,7 @@ public:
     bool poseEstimation2();
     bool poseEstimation3();
     bool poseEstimation4();
+    bool particleFilter();
 
     /**
      * Triggers recording of sensor data to a sensor.log file
@@ -240,6 +253,15 @@ private:
      */
     int getMessageID(int type, int sensor, bool lighthouse = false);
 
+    /**
+     * Constructs 4x4 RT matrix from 6 pose parameters
+     * @param RT filled with
+     * @param pose the pose parameters (r,p,y,x,y,z)
+     */
+    void getRTmatrix(Matrix4d &RT, VectorXd &pose);
+
+    void getTFtransform(VectorXd &x, tf::Transform &tf);
+
 public:
     vector<int> calibrated_sensors;
 private:
@@ -259,9 +281,9 @@ private:
     int sensordata_port;
     UDPSocketPtr sensor_socket, command_socket, logging_socket, imu_socket;
     boost::shared_ptr<thread> sensor_thread = nullptr, tracking_thread = nullptr, calibrate_thread = nullptr,
-            imu_thread = nullptr, poseestimation_thread = nullptr;
+            imu_thread = nullptr, poseestimation_thread = nullptr, particlefilter_thread = nullptr;
     bool receiveData = false, tracking = false, calibrating = false, connected = false, rays = false, recording = false,
-            publishingRelativeFrame = false, poseestimating = false, distances = false;
+            publishingRelativeFrame = false, poseestimating = false, distances = false, particle_filtering = false;
     map<int, Sensor> sensors;
     Vector3d origin;
     Vector4d pose;
