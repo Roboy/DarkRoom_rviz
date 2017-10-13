@@ -13,15 +13,15 @@ using namespace Eigen;
 template <typename state>
 struct ParticleFilter{
     ParticleFilter(int number_of_particles, int states, function<void (int id)> process, function<double (int id)> cost,
-                   double mean, double std):
-            number_of_particles(number_of_particles), process(process), cost(cost){
+                   VectorXd &start, double std):
+            number_of_particles(number_of_particles), process(process), cost(cost), start(start){
         particles.resize(number_of_particles, VectorXd(states));
         weights.resize(number_of_particles, 1.0/number_of_particles);
         costs.resize(number_of_particles,RAND_MAX);
         cumsum.resize(number_of_particles);
         indx.resize(number_of_particles);
 
-        distribution = normal_distribution<double>(mean,std);
+        distribution = normal_distribution<double>(0,std);
         state_length = particles.begin()->size();
 
         resample(true);
@@ -45,8 +45,8 @@ struct ParticleFilter{
         Neff = 1.0/Neff;
 
         if(Neff < number_of_particles/2.0) {
-            cout <<"resample" << endl;
-            resample(false, number_of_particles-Neff);
+            cout <<"resample, Neff: " << Neff << endl;
+            resample(false, Neff);
         }
     }
 
@@ -63,18 +63,17 @@ struct ParticleFilter{
     void resample(bool all, int N = 0){
         if(all){ //resample all
             for(state &particle:particles){
+                particle = start;
                 for(int i=0;i<state_length;i++){
-                    particle(i) = distribution(generator);
+                    particle(i) += distribution(generator);
                 }
             }
         }else{ // Sampling Importance Resampling
-            partial_sum(weights.begin(), weights.end(), cumsum.begin(), plus<double>());
+            vector<size_t> indexes = sort_indexes<double>(weights);
             for(uint i=0;i<N;i++){
-                double sample = rand()/(double)RAND_MAX;
-                uint j = 1;
-                while(cumsum[j]<sample)
-                    j += 1;
-                particles[i] = particles[j];
+                particles[indexes[i]] = particles[indexes[number_of_particles-1-i]];
+                double w0 = weights[indexes[i]], w1 = indexes[number_of_particles-1-i];
+
             }
 
         }
@@ -92,6 +91,20 @@ struct ParticleFilter{
         }
     }
 
+    template <typename T>
+    vector<size_t> sort_indexes(const vector<T> &v) {
+
+        // initialize original index locations
+        vector<size_t> idx(v.size());
+        iota(idx.begin(), idx.end(), 0);
+
+        // sort indexes based on comparing values in v
+        sort(idx.begin(), idx.end(),
+             [&v](size_t i1, size_t i2) {return v[i1] > v[i2];});
+
+        return idx;
+    }
+
     vector<state> particles;
     vector<double> weights, costs;
     vector<double> cumsum;
@@ -100,4 +113,5 @@ struct ParticleFilter{
     default_random_engine generator;
     normal_distribution<double> distribution;
     int state_length;
+    VectorXd start;
 };

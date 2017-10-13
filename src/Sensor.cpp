@@ -1,5 +1,7 @@
 #include "darkroom/Sensor.hpp"
 
+bool Sensor::m_switch = false;
+
 Sensor::Sensor(){
     m_relativePosition3D[0] = Vector3d(0,1,0);
     m_relativePosition3D[1] = Vector3d(0,1,0);

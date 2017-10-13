@@ -1,5 +1,9 @@
 #include "include/darkroom/DarkRoom.hpp"
 
+tf::Transform DarkRoom::lighthouse1;
+tf::Transform DarkRoom::lighthouse2;
+tf::Transform DarkRoom::tf_world;
+
 DarkRoom::DarkRoom(QWidget *parent)
         : rviz::Panel(parent) {
 
@@ -19,9 +23,9 @@ DarkRoom::DarkRoom(QWidget *parent)
     connectWidget->setLayout(new QVBoxLayout);
     tabPage->addTab(connectWidget, "connect");
 
-   QListWidget *listWidget = new QListWidget;
-   listWidget->setObjectName("trackedObjects");
-   connectWidget->layout()->addWidget(listWidget);
+    QListWidget *listWidget = new QListWidget;
+    listWidget->setObjectName("trackedObjects");
+    connectWidget->layout()->addWidget(listWidget);
 
     // QTableWidget *tableWidget = new QTableWidget(4, 4);
     //
@@ -79,6 +83,8 @@ DarkRoom::DarkRoom(QWidget *parent)
 
     QPushButton *switch_lighthouses_button = new QPushButton(tr("switch lighthouses"));
     connect(switch_lighthouses_button, SIGNAL(clicked()), this, SLOT(switch_lighthouses()));
+    switch_lighthouses_button->setCheckable(true);
+    switch_lighthouses_button->setObjectName("switch_lighthouses");
     connectWidget->layout()->addWidget(switch_lighthouses_button);
 
     QPushButton *calibrate_button = new QPushButton(tr("calibrate"));
@@ -311,8 +317,8 @@ void DarkRoom::track(){
         }
         publish_transform = true;
         if(transform_thread==nullptr){
-          transform_thread = boost::shared_ptr<std::thread>(new std::thread(&DarkRoom::transformPublisher, this));
-          transform_thread->detach();
+            transform_thread = boost::shared_ptr<std::thread>(new std::thread(&DarkRoom::transformPublisher, this));
+            transform_thread->detach();
         }
     }
 }
@@ -340,8 +346,8 @@ void DarkRoom::calibrate() {
 void DarkRoom::estimateDistance() {
     for(auto const &object:trackedObjects){
         object.second->startTracking(false);
-        object.second->distanceEstimation(0, object.second->calibrated_sensors);
-        object.second->distanceEstimation(1, object.second->calibrated_sensors);
+        object.second->distanceEstimation(LIGHTHOUSE_A, object.second->calibrated_sensors);
+        object.second->distanceEstimation(LIGHTHOUSE_B, object.second->calibrated_sensors);
         object.second->startTracking(true);
     }
 }
@@ -367,14 +373,14 @@ void DarkRoom::particleFilter() {
 }
 
 void DarkRoom::switch_lighthouses(){
-    lighthouse_switch=!lighthouse_switch;
+    QPushButton *w = this->findChild<QPushButton *>("switch_lighthouses");
     for(auto const &object:trackedObjects){
-        object.second->map_lighthouse_id(lighthouse_switch);
+        object.second->map_lighthouse_id(w->isChecked());
     }
 }
 
 void DarkRoom::transformPublisher(){
-    ros::Rate rate(5);
+    ros::Rate rate(10);
     while(publish_transform){
         tf_broadcaster.sendTransform(tf::StampedTransform(lighthouse1,ros::Time::now(),"world","lighthouse1"));
         tf_broadcaster.sendTransform(tf::StampedTransform(lighthouse2,ros::Time::now(),"world","lighthouse2"));

@@ -146,7 +146,7 @@ public:
         VERTICAL = 1
     };
 private:
-    bool m_switch = true;
+    static bool m_switch;
     Vector3d m_relative_location;
     Vector3d m_position3D, m_relativePosition3D[NUMBER_OF_LIGHTHOUSES], m_relativeOrigin3D[NUMBER_OF_LIGHTHOUSES];
     pair<unsigned short, double> m_angles_horizontal[NUMBER_OF_LIGHTHOUSES], m_angles_vertical[NUMBER_OF_LIGHTHOUSES];

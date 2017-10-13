@@ -161,8 +161,8 @@ private:
     ros::Subscriber pose_correction_sub;
     tf::TransformListener tf_listener;
     tf::TransformBroadcaster tf_broadcaster;
-    tf::Transform lighthouse1, lighthouse2, tf_world;
-    bool lighthouse_switch = true, publish_transform = true, add_new_objects = true;
+    static tf::Transform lighthouse1, lighthouse2, tf_world;
+    bool publish_transform = true, add_new_objects = true;
     int message_counter = 0;
     int object_counter = 0;
     map<int, TrackedObjectPtr> trackedObjects;

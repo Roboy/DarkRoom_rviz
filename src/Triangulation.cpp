@@ -103,7 +103,7 @@ double triangulateFromRays(Vector3d &ray0, Vector3d &ray1,
 }
 
 void rayFromLighthouseAngles(Vector2d &angles, Vector3d &ray) {
-    double beta0 = angles(1), theta0 = angles(0);
+    double theta0 = angles(1), beta0 = angles(0);
     Eigen::Vector3d vec0_vertic(AXIS_OFFSET, sin(beta0), cos(beta0));
     Eigen::Vector3d vec0_horizo(cos(theta0), sin(theta0), AXIS_OFFSET);
 

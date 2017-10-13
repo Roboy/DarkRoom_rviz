@@ -68,6 +68,9 @@ using namespace std;
 
 static vector<int> DEFAULT_VECTOR;
 
+#define LIGHTHOUSE_A false
+#define LIGHTHOUSE_B true
+
 class TrackedObject : public rviz_visualization {
 public:
     TrackedObject();
@@ -240,6 +243,24 @@ private:
     bool getTransform(const char *from, const char *to, Matrix4d &transform);
 
     /**
+     * Queries the tf listener for the specified transform
+     * @param lighthouse will be internally switched if necessary
+     * @param to another frame
+     * @param transform the transform if available
+     * @return true if available
+     */
+    bool getTransform(bool lighthouse, const char *to, Matrix4d &transform);
+
+    /**
+     * Queries the tf listener for the specified transform
+     * @param lighthouse will be internally switched if necessary
+     * @param from another frame
+     * @param transform the transform if available
+     * @return true if available
+     */
+    bool getTransform( const char *from, bool lighthouse, Matrix4d &transform);
+
+    /**
      * clear all markers
      */
     void clearAll();
@@ -288,13 +309,14 @@ private:
     Vector3d origin;
     Vector4d pose;
     Vector4d zero_pose;
-    bool m_switch = false;
+    static bool m_switch;
     ofstream file;
     enum MESSAGE_ID {
         TRIANGULATED = 0,      // for each sensor
         DISTANCE = 1,           // for each sensor and lighthouse
         RAY = 2,   // for each sensor and lighthouse
-        SENSOR_NAME = 3   // for each sensor
+        SENSOR_NAME = 3,   // for each sensor
+        DISTANCES = 4
     };
 };
 
