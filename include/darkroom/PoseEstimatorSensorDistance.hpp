@@ -15,7 +15,9 @@
 
 using namespace Eigen;
 using namespace std;
-namespace LighthousePoseEstimator2 {
+
+namespace PoseEstimatorSensorDistance {
+
 // Generic functor for Eigen Levenberg-Marquardt minimizer
     template<typename _Scalar, int NX = Dynamic, int NY = Dynamic>
     struct Functor {
@@ -39,12 +41,14 @@ namespace LighthousePoseEstimator2 {
         int values() const { return m_values; }
     };
 
-    struct LighthousePoseMinimizer : Functor<double> {
+    struct PoseEstimator : Functor<double> {
         /**
          * Default amount of sensors needed for Eigen templated structure
          * @param numberOfSamples the pose will be estimated using this amount of samples
+         * @param distanceBetweenSensors the distance between the two sensors in mm
          */
-        LighthousePoseMinimizer(int numberOfSensors, MatrixXd &rays_A, MatrixXd &rays_B);
+        PoseEstimator(int numberOfSamples, double distanceBetweenSensors, MatrixXd &rays0_A, MatrixXd &rays0_B,
+                      MatrixXd &rays1_A, MatrixXd &rays1_B);
 
         /**
          * This is the function that is called in each iteration
@@ -54,30 +58,12 @@ namespace LighthousePoseEstimator2 {
          */
         int operator()(const VectorXd &x, VectorXd &fvec) const;
 
-        /**
-         * Constructs a Transform matrix from the given pose vector
-         * @param x the pose vector
-         * @param RT the corresponding transform
-         */
-        void getRTmatrix(VectorXd &x, Matrix4d &RT);
-
-        /**
-         * Constructs a Transform matrix from the optimized pose
-         * @param RT the corresponding transform
-         */
-        void getRTmatrix(Matrix4d &RT);
-
-        /**
-         * Constructs a tf transform from the given pose vector
-         * @param x the pose vector
-         * @param tf the corresponding tf transform
-         */
-        void getTFtransform(VectorXd &x, tf::Transform &tf);
-
         VectorXd pose;
-        MatrixXd rays_A, rays_B; // rays of each lighthouse pointing to the sensors
-        Matrix4d RT_A;
-        vector<double> distances;
-        int numberOfSensors = 4;
+        MatrixXd rays0_A, rays0_B, rays1_A, rays1_B; // rays of each lighthouse pointing to the sensors
+        double distanceBetweenSensors;
+        int numberOfSamples;
+        Matrix4d RT_A, RT_B;
+        static int counter;
     };
+
 }

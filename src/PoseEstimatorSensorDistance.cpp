@@ -1,10 +1,10 @@
-#include "darkroom/LighthousePoseMinimizer.hpp"
+#include "darkroom/PoseEstimatorSensorDistance.hpp"
 
-namespace LighthousePoseEstimator {
+namespace PoseEstimatorSensorDistance {
 
-    int LighthousePoseMinimizer::counter = 0;
+    int PoseEstimator::counter = 0;
 
-    LighthousePoseMinimizer::LighthousePoseMinimizer(int numberOfSamples, double distanceBetweenSensors,
+    PoseEstimator::PoseEstimator(int numberOfSamples, double distanceBetweenSensors,
                                                      MatrixXd &rays0_A, MatrixXd &rays0_B,
                                                      MatrixXd &rays1_A, MatrixXd &rays1_B) :
             Functor<double>(6, 1 * numberOfSamples), numberOfSamples(numberOfSamples),
@@ -13,7 +13,7 @@ namespace LighthousePoseEstimator {
         pose = VectorXd(6);
     }
 
-    int LighthousePoseMinimizer::operator()(const VectorXd &x, VectorXd &fvec) const {
+    int PoseEstimator::operator()(const VectorXd &x, VectorXd &fvec) const {
         Matrix4d RT = MatrixXd::Identity(4, 4);
         // construct quaternion (cf unit-sphere projection Terzakis paper)
         double alpha_squared = pow(pow(x(0), 2.0) + pow(x(1), 2.0) + pow(x(2), 2.0), 2.0);
@@ -66,51 +66,4 @@ namespace LighthousePoseEstimator {
         cout << "x : " << x << endl;
         return 0;
     }
-
-    void LighthousePoseMinimizer::getRTmatrix(VectorXd &x, Matrix4d &RT) {
-        RT = MatrixXd::Identity(3, 4);
-        // construct quaternion (cf unit-sphere projection Terzakis paper)
-        double alpha_squared = pow(pow(x(0), 2.0) + pow(x(1), 2.0) + pow(x(2), 2.0), 2.0);
-        Quaterniond q((1 - alpha_squared) / (alpha_squared + 1),
-                      2.0 * x(0) / (alpha_squared + 1),
-                      2.0 * x(1) / (alpha_squared + 1),
-                      2.0 * x(2) / (alpha_squared + 1));
-        // construct RT matrix
-        RT.topLeftCorner(3, 3) = q.toRotationMatrix();
-        RT.topRightCorner(3, 1) << x(3), x(4), x(5);
-    }
-
-    void LighthousePoseMinimizer::getRTmatrix(Matrix4d &RT) {
-        RT = Matrix4d::Identity();
-        // construct quaternion (cf unit-sphere projection Terzakis paper)
-        double alpha_squared = pow(pow(pose(0), 2.0) + pow(pose(1), 2.0) + pow(pose(2), 2.0), 2.0);
-        Quaterniond q((1 - alpha_squared) / (alpha_squared + 1),
-                      2.0 * pose(0) / (alpha_squared + 1),
-                      2.0 * pose(1) / (alpha_squared + 1),
-                      2.0 * pose(2) / (alpha_squared + 1));
-        // construct RT matrix
-        RT.topLeftCorner(3, 3) = q.toRotationMatrix();
-        RT.topRightCorner(3, 1) << pose(3), pose(4), pose(5);
-    }
-
-    void LighthousePoseMinimizer::getTFtransform(VectorXd &x, tf::Transform &tf) {
-        tf.setOrigin(tf::Vector3(x(3), x(4), x(5)));
-
-        // construct quaternion (cf unit-sphere projection Terzakis paper)
-        double alpha_squared = pow(pow(x(0), 2.0) + pow(x(1), 2.0) + pow(x(2), 2.0), 2.0);
-        Quaterniond q((1 - alpha_squared) / (alpha_squared + 1),
-                      2.0 * x(0) / (alpha_squared + 1),
-                      2.0 * x(1) / (alpha_squared + 1),
-                      2.0 * x(2) / (alpha_squared + 1));
-        q.normalize();
-        Matrix3d rot = q.toRotationMatrix();
-        tf::Quaternion quat;
-        tf::Matrix3x3 rot_matrix(rot(0, 0), rot(0, 1), rot(0, 2),
-                                 rot(1, 0), rot(1, 1), rot(1, 2),
-                                 rot(2, 0), rot(2, 1), rot(2, 2));
-
-        rot_matrix.getRotation(quat);
-        tf.setRotation(quat);
-    }
-
 }

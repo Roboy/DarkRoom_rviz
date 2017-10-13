@@ -1,7 +1,5 @@
 #pragma once
 
-#include <tf/tf.h>
-
 // Eigen
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -11,11 +9,9 @@
 // std
 #include <iostream>
 
-#include "darkroom/Triangulation.hpp"
-
 using namespace Eigen;
 using namespace std;
-namespace LighthousePoseEstimator {
+namespace PoseEstimatorSensorCloud {
 // Generic functor for Eigen Levenberg-Marquardt minimizer
     template<typename _Scalar, int NX = Dynamic, int NY = Dynamic>
     struct Functor {
@@ -39,14 +35,12 @@ namespace LighthousePoseEstimator {
         int values() const { return m_values; }
     };
 
-    struct LighthousePoseMinimizer : Functor<double> {
+    struct PoseEstimator : Functor<double> {
         /**
          * Default amount of sensors needed for Eigen templated structure
-         * @param numberOfSamples the pose will be estimated using this amount of samples
-         * @param distanceBetweenSensors the distance between the two sensors in mm
+         * @param numberOfSensors you can however choose any number of sensors here
          */
-        LighthousePoseMinimizer(int numberOfSamples, double distanceBetweenSensors, MatrixXd &rays0_A, MatrixXd &rays0_B,
-                                MatrixXd &rays1_A, MatrixXd &rays1_B);
+        PoseEstimator(int numberOfSensors = 4);
 
         /**
          * This is the function that is called in each iteration
@@ -56,31 +50,8 @@ namespace LighthousePoseEstimator {
          */
         int operator()(const VectorXd &x, VectorXd &fvec) const;
 
-        /**
-         * Constructs a Transform matrix from the given pose vector
-         * @param x the pose vector
-         * @param RT the corresponding transform
-         */
-        void getRTmatrix(VectorXd &x, Matrix4d &RT);
-
-        /**
-         * Constructs a Transform matrix from the optimized pose
-         * @param RT the corresponding transform
-         */
-        void getRTmatrix(Matrix4d &RT);
-
-        /**
-         * Constructs a tf transform from the given pose vector
-         * @param x the pose vector
-         * @param tf the corresponding tf transform
-         */
-        void getTFtransform(VectorXd &x, tf::Transform &tf);
-
         VectorXd pose;
-        MatrixXd rays0_A, rays0_B, rays1_A, rays1_B; // rays of each lighthouse pointing to the sensors
-        double distanceBetweenSensors;
-        int numberOfSamples;
-        Matrix4d RT_A, RT_B;
-        static int counter;
+        MatrixXd pos3D_A, pos3D_B; // 3d relative sensor positions wrt a common frame (eg worl_vive frame)
+        int numberOfSensors = 4;
     };
 }

@@ -54,26 +54,35 @@ include_directories(
 # Application
 #==============================================================================
 
-add_library( UDPSocket src/UDPSocket.cpp ${PROTO_SRCS} ${PROTO_HDRS})
-target_link_libraries( UDPSocket ${catkin_LIBRARIES} ${PROTOBUF_LIBRARY} )
+add_library( ParticleFilter src/ParticleFilter.cpp )
 
-add_library( PoseMinimizer src/PoseMinimizer.cpp src/LighthousePoseMinimizer.cpp src/LighthousePoseMinimizer2.cpp)
-target_link_libraries( PoseMinimizer ${catkin_LIBRARIES} )
+add_library( PoseEstimatorSensorCloud src/PoseEstimatorSensorCloud.cpp )
+
+add_library( PoseEstimatorSensorDistance src/PoseEstimatorSensorDistance.cpp )
+
+add_library( PoseEstimatorSensorDistances src/PoseEstimatorSensorDistances.cpp )
+
+add_library( Transform src/Transform.cpp )
+target_link_libraries( Transform ${catkin_LIBRARIES} )
+
+add_library( Triangulate src/Triangulation.cpp )
+target_link_libraries( Triangulate ${catkin_LIBRARIES} )
+
+add_library( LighthouseEstimator src/LighthouseEstimator.cpp  mavmap/src/base3d/projection.cc
+		epnp/epnp.cpp mavmap/src/base3d/p3p.cc mavmap/src/util/math.cc)
+target_link_libraries( LighthouseEstimator ${catkin_LIBRARIES} PoseEstimatorSensorCloud PoseEstimatorSensorDistance
+		PoseEstimatorSensorDistances rviz_visualization Transform Triangulate)
 
 add_library( Sensor src/Sensor.cpp )
 target_link_libraries( Sensor ${catkin_LIBRARIES} )
 
-add_library( TrackedObject src/TrackedObject.cpp mavmap/src/base3d/triangulation.cc mavmap/src/base3d/projection.cc
-		epnp/epnp.cpp mavmap/src/base3d/p3p.cc mavmap/src/util/math.cc src/ParticleFilter.cpp)
+add_library( TrackedObject src/TrackedObject.cpp )
 add_dependencies(TrackedObject roboy_communication_simulation_gencpp)
-target_link_libraries( TrackedObject ${yaml-cpp_LIBRARIES} ${catkin_LIBRARIES} ${OpenCV_LIBS} UDPSocket PoseMinimizer Sensor )
+target_link_libraries( TrackedObject ${yaml-cpp_LIBRARIES} ${catkin_LIBRARIES} ${OpenCV_LIBS} Sensor LighthouseEstimator)
 
 qt5_wrap_cpp(MOC_FILES include/darkroom/DarkRoom.hpp include/darkroom/TrackedObjectDelegate.hpp)
-add_library( darkroom src/DarkRoom.cpp src/TrackedObjectDelegate.cpp ${MOC_FILES} src/Triangulation.cpp src/ParticleFilter.cpp)
+add_library( darkroom src/DarkRoom.cpp src/TrackedObjectDelegate.cpp ${MOC_FILES})
 target_link_libraries( darkroom ${QT_LIBRARIES} ${catkin_LIBRARIES} TrackedObject rviz_visualization)
-
-add_executable( CommunicationTest src/CommunicationTest.cpp)
-target_link_libraries( CommunicationTest ${catkin_LIBRARIES} UDPSocket )
 
 #==============================================================================
 # Installation
@@ -81,11 +90,6 @@ target_link_libraries( CommunicationTest ${catkin_LIBRARIES} UDPSocket )
 install(TARGETS
         darkroom
 	    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-        )
-
-install(TARGETS
-		CommunicationTest
-	    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
         )
 
 install(FILES
