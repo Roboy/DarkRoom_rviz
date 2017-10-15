@@ -70,6 +70,7 @@ target_link_libraries( Triangulate ${catkin_LIBRARIES} )
 
 add_library( LighthouseEstimator src/LighthouseEstimator.cpp  mavmap/src/base3d/projection.cc
 		epnp/epnp.cpp mavmap/src/base3d/p3p.cc mavmap/src/util/math.cc)
+add_dependencies(LighthouseEstimator roboy_communication_simulation_gencpp)
 target_link_libraries( LighthouseEstimator ${catkin_LIBRARIES} PoseEstimatorSensorCloud PoseEstimatorSensorDistance
 		PoseEstimatorSensorDistances rviz_visualization Transform Triangulate)
 

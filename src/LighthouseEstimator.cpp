@@ -485,7 +485,7 @@ bool LighthouseEstimator::poseEstimationP3P(){
     publishTF(tf, "lighthouse1", "object_p3p");
 }
 
-bool LighthouseEstimator::poseEstimationSensorCloud(tf::Transform &tf){
+bool LighthouseEstimator::poseEstimationSensorCloud(){
     ros::Time start_time = ros::Time::now();
     while (!estimateSensorPositionsUsingRelativeDistances(0, calibrated_sensors)) {
         ROS_INFO_THROTTLE(1,
@@ -554,7 +554,15 @@ bool LighthouseEstimator::poseEstimationSensorCloud(tf::Transform &tf){
     int ret = lm->minimize(pose);
     ROS_INFO("PoseEstimationSensorCloud finished after %ld iterations, with an error of %f", lm->iter, lm->fnorm);
 
+    tf::Transform tf;
     getTFtransform(pose, tf);
+
+    roboy_communication_middleware::LighthousePoseCorrection msg;
+    msg.id = LIGHTHOUSE_B;
+    msg.id = RELATIV;
+    tf::transformTFToMsg(tf, msg.tf);
+    lighthouse_pose_correction.publish(msg);
+
 }
 
 bool LighthouseEstimator::poseEstimationSensorDistance(){
@@ -672,7 +680,8 @@ bool LighthouseEstimator::poseEstimationSensorDistance(){
     getTFtransform(pose, tf);
 
     roboy_communication_middleware::LighthousePoseCorrection msg;
-    msg.id = 1;
+    msg.id = LIGHTHOUSE_B;
+    msg.type = ABSOLUT;
     tf::transformTFToMsg(tf, msg.tf);
     lighthouse_pose_correction.publish(msg);
 
@@ -760,7 +769,8 @@ bool LighthouseEstimator::poseEstimationSensorDistances(){
     getTFtransform(pose, tf);
 
     roboy_communication_middleware::LighthousePoseCorrection msg;
-    msg.id = 1;
+    msg.id = LIGHTHOUSE_B;
+    msg.type = ABSOLUT;
     tf::transformTFToMsg(tf, msg.tf);
     lighthouse_pose_correction.publish(msg);
 
@@ -957,7 +967,7 @@ bool LighthouseEstimator::poseEstimationParticleFilter(){
 
     roboy_communication_middleware::LighthousePoseCorrection msg;
     msg.id = LIGHTHOUSE_B;
-    msg.type = 1; // absolute correction
+    msg.type = ABSOLUT;
     tf::transformTFToMsg(tf, msg.tf);
     lighthouse_pose_correction.publish(msg);
 }

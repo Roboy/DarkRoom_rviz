@@ -251,6 +251,7 @@ namespace DarkRoomRviz {
         if (trackedObjects.empty())
             w->setChecked(false);
         for (auto const &object:trackedObjects) {
+            lock_guard<mutex> (object.second->mux);
             object.second->record(w->isChecked());
         }
     }
@@ -258,6 +259,7 @@ namespace DarkRoomRviz {
     void DarkRoom::showRays() {
         QCheckBox *w = this->findChild<QCheckBox *>("rays");
         for (auto const &object:trackedObjects) {
+            lock_guard<mutex> (object.second->mux);
             object.second->rays = w->isChecked();
         }
     }
@@ -265,6 +267,7 @@ namespace DarkRoomRviz {
     void DarkRoom::showDistances() {
         QCheckBox *w = this->findChild<QCheckBox *>("distances");
         for (auto const &object:trackedObjects) {
+            lock_guard<mutex> (object.second->mux);
             object.second->distances = w->isChecked();
         }
     }
@@ -272,6 +275,7 @@ namespace DarkRoomRviz {
     void DarkRoom::switch_lighthouses() {
         QCheckBox *w = this->findChild<QCheckBox *>("switch_lighthouses");
         for (auto const &object:trackedObjects) {
+            lock_guard<mutex> (object.second->mux);
             object.second->switchLighthouses(w->isChecked());
         }
     }
@@ -279,11 +283,14 @@ namespace DarkRoomRviz {
     void DarkRoom::startCalibrateRelativeSensorDistances() {
         QCheckBox *w = this->findChild<QCheckBox *>("calibrate");
         for (uint i=0; i<trackedObjects.size(); i++) {
+            lock_guard<mutex> (trackedObjects[i]->mux);
             if (w->isChecked()) {
                 ROS_INFO("starting calibration thread");
                 trackedObjects[i]->calibrating = true;
                 trackedObjects[i]->calibrate_thread = boost::shared_ptr<boost::thread>(
-                        new boost::thread([this, i]{this->trackedObjects[i]->calibrateRelativeSensorDistances();}));
+                        new boost::thread(
+                                [this, i](){this->trackedObjects[i]->calibrateRelativeSensorDistances();}
+                        ));
                 trackedObjects[i]->calibrate_thread->detach();
             } else {
                 if (trackedObjects[i]->calibrate_thread != nullptr) {
@@ -300,11 +307,14 @@ namespace DarkRoomRviz {
     void DarkRoom::startTriangulation() {
         QCheckBox *w = this->findChild<QCheckBox *>("triangulate");
         for (uint i=0; i<trackedObjects.size(); i++) {
+            lock_guard<mutex> (trackedObjects[i]->mux);
             if (w->isChecked()) {
                 ROS_INFO("starting tracking thread");
                 trackedObjects[i]->tracking = true;
                 trackedObjects[i]->tracking_thread = boost::shared_ptr<boost::thread>(
-                        new boost::thread([this, i](){this->trackedObjects[i]->triangulateSensors();}));
+                        new boost::thread(
+                                [this, i](){this->trackedObjects[i]->triangulateSensors();}
+                        ));
                 trackedObjects[i]->tracking_thread->detach();
             } else {
                 if (trackedObjects[i]->tracking_thread != nullptr) {
@@ -322,13 +332,13 @@ namespace DarkRoomRviz {
     void DarkRoom::startPoseEstimationSensorCloud() {
         QCheckBox *w = this->findChild<QCheckBox *>("poseestimation_sensor_cloud");
         for (uint i=0; i<trackedObjects.size(); i++) {
+            lock_guard<mutex> (trackedObjects[i]->mux);
             if (w->isChecked()) {
                 ROS_INFO("starting pose estimation thread");
                 trackedObjects[i]->poseestimating = true;
                 trackedObjects[i]->poseestimation_thread = boost::shared_ptr<boost::thread>(
                         new boost::thread([this, i](){
-                            tf::Transform tf;
-                            trackedObjects[i]->poseEstimationSensorCloud(tf);
+                            trackedObjects[i]->poseEstimationSensorCloud();
                         }));
                 trackedObjects[i]->poseestimation_thread->detach();
             } else {
@@ -346,11 +356,14 @@ namespace DarkRoomRviz {
     void DarkRoom::startPoseEstimationParticleFilter() {
         QCheckBox *w = this->findChild<QCheckBox *>("particle_filter");
         for (uint i=0; i<trackedObjects.size(); i++) {
+            lock_guard<mutex> (trackedObjects[i]->mux);
             if (w->isChecked()) {
                 ROS_INFO("starting particle filter thread");
                 trackedObjects[i]->particle_filtering = true;
                 trackedObjects[i]->particlefilter_thread = boost::shared_ptr<boost::thread>(
-                        new boost::thread([this, i](){this->trackedObjects[i]->poseEstimationParticleFilter();}));
+                        new boost::thread(
+                                [this, i](){this->trackedObjects[i]->poseEstimationParticleFilter();}
+                        ));
                 trackedObjects[i]->particlefilter_thread->detach();
             } else {
                 if (trackedObjects[i]->particlefilter_thread != nullptr) {
@@ -381,15 +394,15 @@ namespace DarkRoomRviz {
     void DarkRoom::correctPose(const roboy_communication_middleware::LighthousePoseCorrection &msg) {
         tf::Transform tf;
         tf::transformMsgToTF(msg.tf, tf);
-        if (msg.id == 0) {
-            if (msg.type == 0)
+        if (msg.id == LIGHTHOUSE_A) {
+            if (msg.type == 0) // relativ
                 lighthouse1 = tf * lighthouse1;
-            else
+            else    // absolut
                 lighthouse1 = tf;
         } else {
-            if (msg.type == 0)
+            if (msg.type == 0) // relativ
                 lighthouse2 = tf * lighthouse2;
-            else
+            else    // absolut
                 lighthouse2 = tf;
         }
     }

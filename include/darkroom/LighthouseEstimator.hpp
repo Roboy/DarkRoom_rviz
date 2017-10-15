@@ -12,6 +12,9 @@
 #include "epnp/epnp.h"
 #include "mavmap/src/base3d/p3p.h"
 
+#include <atomic>
+#include <mutex>
+
 #define LIGHTHOUSE_A false
 #define LIGHTHOUSE_B true
 
@@ -31,10 +34,9 @@ public:
     /**
      * Estimates the pose correction between ligthhouse 1 and 2, such that the squared distances between sensor positions
      * estimated for both lighthouses is minimized.
-     * @param tf the corrective transform for lighthouse 2
      * @return success
      */
-    bool poseEstimationSensorCloud(tf::Transform &tf);
+    bool poseEstimationSensorCloud();
 
     /**
     * Estimates the sensor distances of all active sensors (or a vector of specified sensor ids)
@@ -80,10 +82,15 @@ public:
         DISTANCES = 4
     };
 
+    enum POSE_CORRECTION_TYPE{
+        RELATIV = 0,
+        ABSOLUT = 1
+    };
+
     map<int, Sensor> sensors;
     vector<int> calibrated_sensors;
-    bool tracking = false, calibrating = false, poseestimating = false, distances = false, rays = false,
-            particle_filtering = false;
+    atomic<bool> tracking, calibrating, poseestimating, distances, rays, particle_filtering;
+    mutex mux;
 private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;
