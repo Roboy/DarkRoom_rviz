@@ -4,10 +4,6 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
-// mavmap
-#include "base3d/triangulation.h"
-#include "base3d/projection.h"
-
 // offset from center of laser rotation
 #define AXIS_OFFSET -0.015
 

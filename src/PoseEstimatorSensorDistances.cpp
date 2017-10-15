@@ -37,18 +37,19 @@ namespace PoseEstimatorSensorDistances {
 
         fvec = VectorXd::Zero(numberOfSensors+3);
 
-        for (int i = 0; i < numberOfSensors; i++) {
-            // project onto image plane
-            Eigen::Vector2d projected_image_location0 = Eigen::Vector2d(rays_A(0, i) / rays_A(2, i),
-                                                                        rays_A(1, i) / rays_A(2, i));
-            Eigen::Vector2d projected_image_location1 = Eigen::Vector2d(new_rays_B(0, i) / new_rays_B(2, i),
-                                                                        new_rays_B(1, i) / new_rays_B(2, i));
-            Vector3d pos = triangulate_point(proj_matrix0, proj_matrix1,
-                                              projected_image_location0, projected_image_location1);
-            Vector3d ray(rays_A(0,i), rays_A(1,i), rays_A(2,i));
-            fvec(i) = (-pos.cross(-ray)).norm()/ray.norm();
-            cout << fvec(i) << endl;
-        }
+        // TODO: use simpler triangulation function
+//        for (int i = 0; i < numberOfSensors; i++) {
+//            // project onto image plane
+//            Eigen::Vector2d projected_image_location0 = Eigen::Vector2d(rays_A(0, i) / rays_A(2, i),
+//                                                                        rays_A(1, i) / rays_A(2, i));
+//            Eigen::Vector2d projected_image_location1 = Eigen::Vector2d(new_rays_B(0, i) / new_rays_B(2, i),
+//                                                                        new_rays_B(1, i) / new_rays_B(2, i));
+//            Vector3d pos = triangulate_point(proj_matrix0, proj_matrix1,
+//                                              projected_image_location0, projected_image_location1);
+//            Vector3d ray(rays_A(0,i), rays_A(1,i), rays_A(2,i));
+//            fvec(i) = (-pos.cross(-ray)).norm()/ray.norm();
+//            cout << fvec(i) << endl;
+//        }
 //        for (int i = 1; i < numberOfSensors; i++) {
 //            fvec(i) = difference(0, i);
 //        }

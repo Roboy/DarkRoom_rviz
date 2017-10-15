@@ -459,30 +459,31 @@ bool LighthouseEstimator::poseEstimationEPnP(){
 }
 
 bool LighthouseEstimator::poseEstimationP3P(){
-    P3PEstimator p3PEstimator;
-    std::vector<Eigen::MatrixXd> result;
-    MatrixXd points2d(calibrated_sensors.size(), 2), points3d(calibrated_sensors.size(), 3);
-    uint i = 0;
-    for (uint id:calibrated_sensors) {
-        Vector3d pos, ray;
-        Vector2d angles;
-        sensors[id].get(0, pos);
-        sensors[id].get(0, angles);
-        rayFromLighthouseAngles(angles, ray);
-        points2d(i, 0) = ray(0) / ray(1);
-        points2d(i, 1) = ray(2) / ray(1);
-        points3d(i, 0) = pos(0);
-        points3d(i, 1) = pos(1);
-        points3d(i, 2) = pos(2);
-    }
-    result = p3PEstimator.estimate(points2d, points3d);
-    tf::Transform tf;
-    Vector3d position = result[0].topRightCorner(3, 1);
-    cout << "p3p: " << endl << result[0] << endl;
-    cout << "p3p position: " << endl << position << endl;
-    tf.setOrigin(tf::Vector3(position(0), position(1), position(2)));
-    tf.setRotation(tf::Quaternion(1, 0, 0, 0));
-    publishTF(tf, "lighthouse1", "object_p3p");
+    // TODO: include p3p properly
+//    P3PEstimator p3PEstimator;
+//    std::vector<Eigen::MatrixXd> result;
+//    MatrixXd points2d(calibrated_sensors.size(), 2), points3d(calibrated_sensors.size(), 3);
+//    uint i = 0;
+//    for (uint id:calibrated_sensors) {
+//        Vector3d pos, ray;
+//        Vector2d angles;
+//        sensors[id].get(0, pos);
+//        sensors[id].get(0, angles);
+//        rayFromLighthouseAngles(angles, ray);
+//        points2d(i, 0) = ray(0) / ray(1);
+//        points2d(i, 1) = ray(2) / ray(1);
+//        points3d(i, 0) = pos(0);
+//        points3d(i, 1) = pos(1);
+//        points3d(i, 2) = pos(2);
+//    }
+//    result = p3PEstimator.estimate(points2d, points3d);
+//    tf::Transform tf;
+//    Vector3d position = result[0].topRightCorner(3, 1);
+//    cout << "p3p: " << endl << result[0] << endl;
+//    cout << "p3p position: " << endl << position << endl;
+//    tf.setOrigin(tf::Vector3(position(0), position(1), position(2)));
+//    tf.setRotation(tf::Quaternion(1, 0, 0, 0));
+//    publishTF(tf, "lighthouse1", "object_p3p");
 }
 
 bool LighthouseEstimator::poseEstimationSensorCloud(){
@@ -660,19 +661,21 @@ bool LighthouseEstimator::poseEstimationSensorDistance(){
         Eigen::Vector2d projected_image_location1 = Eigen::Vector2d(rays0_B(0, i) / rays0_B(2, i),
                                                                     rays0_B(1, i) / rays0_B(2, i));
 
-        Vector3d pos0 = triangulate_point(proj_matrix0, proj_matrix1,
-                                          projected_image_location0, projected_image_location1);
+        // TODO: use simpler trinagulation
+//        Vector3d pos0 = triangulate_point(proj_matrix0, proj_matrix1,
+//                                          projected_image_location0, projected_image_location1);
 
         projected_image_location0 = Eigen::Vector2d(rays1_A(0, i) / rays1_A(2, i),
                                                     rays1_A(1, i) / rays1_A(2, i));
         projected_image_location1 = Eigen::Vector2d(rays1_B(0, i) / rays1_B(2, i),
                                                     rays1_B(1, i) / rays1_B(2, i));
 
-        Vector3d pos1 = triangulate_point(proj_matrix0, proj_matrix1,
-                                          projected_image_location0, projected_image_location1);
-        publishSphere(pos0, "world", "tri", rand(), COLOR(1, 0, 0, 1));
-        publishSphere(pos1, "world", "tri", rand(), COLOR(1, 0, 0, 1));
-        ROS_INFO_STREAM((pos1 - pos0).norm());
+        // TODO: use simpler trinagulation
+//        Vector3d pos1 = triangulate_point(proj_matrix0, proj_matrix1,
+//                                          projected_image_location0, projected_image_location1);
+//        publishSphere(pos0, "world", "tri", rand(), COLOR(1, 0, 0, 1));
+//        publishSphere(pos1, "world", "tri", rand(), COLOR(1, 0, 0, 1));
+//        ROS_INFO_STREAM((pos1 - pos0).norm());
     }
 
 

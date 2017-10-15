@@ -81,7 +81,8 @@ private:
 
 public:
     boost::shared_ptr<boost::thread> sensor_thread = nullptr, tracking_thread = nullptr, calibrate_thread = nullptr,
-            imu_thread = nullptr, poseestimation_thread = nullptr, particlefilter_thread = nullptr;
+            imu_thread = nullptr, poseestimation_thread = nullptr, particlefilter_thread = nullptr, distance_thread_1 = nullptr,
+            distance_thread_2 = nullptr;
 private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;

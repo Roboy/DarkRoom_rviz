@@ -5,12 +5,12 @@
 #include "darkroom/PoseEstimatorSensorDistances.hpp"
 #include "darkroom/ParticleFilter.hpp"
 #include "darkroom/Sensor.hpp"
-#include "common_utilities/rviz_visualization.hpp"
+#include <common_utilities/rviz_visualization.hpp>
 #include <roboy_communication_middleware/LighthousePoseCorrection.h>
 #include <roboy_communication_middleware/DarkRoomSensor.h>
 
-#include "epnp/epnp.h"
-#include "mavmap/src/base3d/p3p.h"
+#include <darkroom/epnp/epnp.h>
+//#include <darkroom/mavmap/src/base3d/p3p.h>
 
 #include <atomic>
 #include <mutex>

@@ -190,15 +190,12 @@ namespace DarkRoomRviz {
     }
 
     DarkRoom::~DarkRoom() {
-        publish_transform = false;
-        if (transform_thread->joinable()) {
-            ROS_INFO("waiting for transform thread to shut down");
-            transform_thread->join();
-        }
-        add_new_objects = false;
-        if (object_listener_thread->joinable()) {
-            ROS_INFO("waiting for object listener thread to shut down");
-            object_listener_thread->join();
+        if(transform_thread!=nullptr) {
+            publish_transform = false;
+            if (transform_thread->joinable()) {
+                ROS_INFO("waiting for transform thread to shut down");
+                transform_thread->join();
+            }
         }
     }
 

@@ -37,18 +37,19 @@ include_directories(${PROTOBUF_INCLUDE_DIR})
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS protobuf/lighthouse.proto)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-catkin_package(CATKIN_DEPENDS message_runtime roboy_communication_middleware common_utilities )
+catkin_package(CATKIN_DEPENDS message_runtime roboy_communication_middleware common_utilities INCLUDE_DIRS include
+        LIBRARIES ParticleFilter PoseEstimatorSensorCloud PoseEstimatorSensorDistance PoseEstimatorSensorDistances
+        Transform Triangulate LighthouseEstimator Sensor TrackedObject darkroom)
 
 include_directories(
 		include/
-        mavmap/src
+        include/darkroom/mavmap/src
         ${catkin_INCLUDE_DIRS}
 		${Qt5Widgets_INCLUDE_DIRS}
 		${Qt5Core_INCLUDE_DIRS}
 		${Qt5Gui_INCLUDE_DIRS}
         ${OpenCV_INCLUDE_DIRS}
         ${ncurses_INCLUDE_DIRS}
-		../common_utilities/include
 )
 #==============================================================================
 # Application
@@ -68,8 +69,8 @@ target_link_libraries( Transform ${catkin_LIBRARIES} )
 add_library( Triangulate src/Triangulation.cpp )
 target_link_libraries( Triangulate ${catkin_LIBRARIES} )
 
-add_library( LighthouseEstimator src/LighthouseEstimator.cpp  mavmap/src/base3d/projection.cc
-		epnp/epnp.cpp mavmap/src/base3d/p3p.cc mavmap/src/util/math.cc)
+add_library( LighthouseEstimator src/LighthouseEstimator.cpp  include/darkroom/mavmap/src/base3d/projection.cc
+        include/darkroom/epnp/epnp.cpp include/darkroom/mavmap/src/base3d/p3p.cc include/darkroom/mavmap/src/util/math.cc)
 add_dependencies(LighthouseEstimator roboy_communication_simulation_gencpp)
 target_link_libraries( LighthouseEstimator ${catkin_LIBRARIES} PoseEstimatorSensorCloud PoseEstimatorSensorDistance
 		PoseEstimatorSensorDistances rviz_visualization Transform Triangulate)
@@ -89,6 +90,15 @@ target_link_libraries( darkroom ${QT_LIBRARIES} ${catkin_LIBRARIES} TrackedObjec
 # Installation
 #==============================================================================
 install(TARGETS
+        ParticleFilter
+        PoseEstimatorSensorCloud
+        PoseEstimatorSensorDistance
+        PoseEstimatorSensorDistances
+        Transform
+        Triangulate
+        LighthouseEstimator
+        Sensor
+        TrackedObject
         darkroom
 	    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         )
@@ -97,3 +107,13 @@ install(FILES
         package.xml
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
+
+install(DIRECTORY include/darkroom/
+        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+        FILES_MATCHING PATTERN "*.hpp"
+        )
+
+install(DIRECTORY include/darkroom/
+        DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+        FILES_MATCHING PATTERN "*.h"
+        )
