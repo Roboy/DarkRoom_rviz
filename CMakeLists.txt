@@ -80,7 +80,8 @@ target_link_libraries( Sensor ${catkin_LIBRARIES} )
 
 add_library( TrackedObject src/TrackedObject.cpp )
 add_dependencies(TrackedObject roboy_communication_simulation_gencpp)
-target_link_libraries( TrackedObject ${yaml-cpp_LIBRARIES} ${catkin_LIBRARIES} ${OpenCV_LIBS} Sensor LighthouseEstimator)
+target_link_libraries( TrackedObject ${yaml-cpp_LIBRARIES} ${catkin_LIBRARIES} ${OpenCV_LIBS}
+		Sensor LighthouseEstimator UDPSocket)
 
 qt5_wrap_cpp(MOC_FILES include/darkroom/DarkRoom.hpp include/darkroom/TrackedObjectDelegate.hpp)
 add_library( darkroom src/DarkRoom.cpp src/TrackedObjectDelegate.cpp ${MOC_FILES})

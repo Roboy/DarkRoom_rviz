@@ -1,27 +1,19 @@
 #pragma once
 
-// ros
 #include <ros/ros.h>
 #include <roboy_communication_middleware/DarkRoom.h>
-
-// Eigen
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
-
-// std
 #include <map>
 #include <fstream>
 #include <deque>
 #include <thread>
 #include <mutex>
 #include <bitset>
-
-// yaml-cpp
 #include "yaml-cpp/yaml.h"
-
 #include <common_utilities/rviz_visualization.hpp>
-
+#include <common_utilities/UDPSocket.hpp>
 #include "darkroom/LighthouseEstimator.hpp"
 
 // Converts degrees to radians.
@@ -44,6 +36,12 @@ public:
      * This function initializes a subscriber for roboy darkroom
      */
     void connectRoboy();
+    /**
+     * connect an arbitrary object via UDP socket
+     * @param broadcastIP your broadcast ip (check with ifconfig)
+     * @param port the port to listen on
+     */
+    void connectObject(const char* broadcastIP, int port);
 
     /**
      * This function switches the lighthouse ids
@@ -75,14 +73,20 @@ public:
 private:
 
     /**
-     * Continuesly receiving, decoding and updating the sensor data
+     * Continuously receiving, decoding and updating the sensor data from ROS message
      */
     void receiveSensorDataRoboy(const roboy_communication_middleware::DarkRoom::ConstPtr &msg);
+
+    /**
+     * Listen for sensor data via UDP
+     */
+    void receiveSensorData();
 
 public:
     boost::shared_ptr<boost::thread> sensor_thread = nullptr, tracking_thread = nullptr, calibrate_thread = nullptr,
             imu_thread = nullptr, poseestimation_thread = nullptr, particlefilter_thread = nullptr, distance_thread_1 = nullptr,
             distance_thread_2 = nullptr;
+    std::atomic<bool> receiveData, recording;
 private:
     ros::NodeHandlePtr nh;
     boost::shared_ptr<ros::AsyncSpinner> spinner;
@@ -92,10 +96,10 @@ private:
     string name = "bastiisdoff";
     string mesh = "pimmel";
     vector<Eigen::Vector3f> object;
-    bool receiveData = false, recording = false;
     Vector3d origin;
     static bool m_switch;
     ofstream file;
+    boost::shared_ptr<UDPSocket> socket;
 };
 
 typedef boost::shared_ptr<TrackedObject> TrackedObjectPtr;

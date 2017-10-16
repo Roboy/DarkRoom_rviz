@@ -23,7 +23,6 @@ TrackedObject::TrackedObject() {
         ROS_WARN("could not get DARKROOM_CALIBRATED_OBJECTS environmental variable");
 
     trackeObjectInstance++;
-
 }
 
 TrackedObject::~TrackedObject() {
@@ -31,6 +30,7 @@ TrackedObject::~TrackedObject() {
     tracking = false;
     calibrating = false;
     poseestimating = false;
+    receiveData = false;
     if (sensor_thread != nullptr) {
         if (sensor_thread->joinable()) {
             ROS_INFO("Waiting for sensor thread to terminate");
@@ -60,6 +60,16 @@ TrackedObject::~TrackedObject() {
 void TrackedObject::connectRoboy() {
     receiveData = true;
     sensor_sub = nh->subscribe("/roboy/middleware/DarkRoom/sensors", 1, &TrackedObject::receiveSensorDataRoboy, this);
+}
+
+void TrackedObject::connectObject(const char* broadcastIP, int port){
+    uint32_t ip;
+    inet_pton(AF_INET, broadcastIP, &ip);
+    socket = UDPSocketPtr(new UDPSocket(port, ip));
+    lock_guard<mutex> lock(mux);
+    receiveData = true;
+    sensor_thread = boost::shared_ptr<boost::thread>(new boost::thread(&TrackedObject::receiveSensorData, this));
+    sensor_thread->detach();
 }
 
 void TrackedObject::switchLighthouses(bool switchID) {
@@ -139,6 +149,24 @@ void TrackedObject::receiveSensorDataRoboy(const roboy_communication_middleware:
             sensors[id].update(lighthouse, rotor, timestamp, ticksToRadians(sweepDuration));
         }
         id++;
+    }
+}
+
+void TrackedObject::receiveSensorData(){
+    while(receiveData){
+        uint32_t id;
+        bool lighthouse;
+        bool rotor;
+        uint32_t sweepDuration;
+        if(socket->receiveSensorData(id,lighthouse,rotor,sweepDuration)){
+            ROS_INFO_STREAM_THROTTLE(1,
+                "id:            " << id << endl <<
+                "lighthouse:    " << lighthouse << endl <<
+                "rotor:         " << rotor << endl <<
+                "sweepDuration: " << sweepDuration);
+            unsigned short timestamp = (unsigned short) (ros::Time::now().sec & 0xFF);
+            sensors[id].update(lighthouse, rotor, timestamp, ticksToRadians(sweepDuration));
+        }
     }
 }
 
