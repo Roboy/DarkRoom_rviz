@@ -157,15 +157,20 @@ void TrackedObject::receiveSensorData(){
         uint32_t id;
         bool lighthouse;
         bool rotor;
-        uint32_t sweepDuration;
+        uint16_t sweepDuration;
         if(socket->receiveSensorData(id,lighthouse,rotor,sweepDuration)){
-            ROS_INFO_STREAM_THROTTLE(1,
-                "id:            " << id << endl <<
-                "lighthouse:    " << lighthouse << endl <<
-                "rotor:         " << rotor << endl <<
-                "sweepDuration: " << sweepDuration);
+            ROS_INFO_STREAM(
+                "id:              " << id <<
+                "\tlighthouse:    " << lighthouse <<
+                "\trotor:         " << rotor <<
+                "\tsweepDuration: " << sweepDuration);
             unsigned short timestamp = (unsigned short) (ros::Time::now().sec & 0xFF);
-            sensors[id].update(lighthouse, rotor, timestamp, ticksToRadians(sweepDuration));
+            sensors[id].update(lighthouse, rotor, timestamp, uSecsToRadians(sweepDuration));
+//            Vector2d angles;
+//            sensors[id].get(0,angles);
+//            cout << angles << endl;
+//            sensors[id].get(1,angles);
+//            cout << angles << endl;
         }
     }
 }
