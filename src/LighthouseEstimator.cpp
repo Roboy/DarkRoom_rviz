@@ -15,6 +15,12 @@ LighthouseEstimator::LighthouseEstimator() {
     spinner = boost::shared_ptr<ros::AsyncSpinner>(new ros::AsyncSpinner(1));
     spinner->start();
 
+    tracking = false;
+    calibrating = false;
+    poseestimating = false;
+    distances = false;
+    rays = false;
+    particle_filtering = false;
 }
 
 void LighthouseEstimator::calibrateRelativeSensorDistances(){
@@ -364,22 +370,22 @@ void LighthouseEstimator::triangulateSensors(){
                     }
 
                     if (rays) {
-                        {
+//                        {
+////
+//                            Vector3d origin0, origin1;
+//                            origin0 = RT_0.topRightCorner(3, 1);
+//                            origin1 = RT_1.topRightCorner(3, 1);
 //
-                            Vector3d origin0, origin1;
-                            origin0 = RT_0.topRightCorner(3, 1);
-                            origin1 = RT_1.topRightCorner(3, 1);
-
-                            Vector3d ray0_worldFrame, ray1_worldFrame;
-
-                            ray0_worldFrame = RT_0.topLeftCorner(3, 3)*ray0;
-                            ray1_worldFrame = RT_1.topLeftCorner(3, 3)*ray1;
-
-                            publishRay(origin0, ray0_worldFrame, "world", "rays_lighthouse_1", rand(),
-                                       COLOR(1, 0, 1, 1.0), 1);
-                            publishRay(origin1, ray1_worldFrame, "world", "rays_lighthouse_2", rand(),
-                                       COLOR(1, 0, 1, 1.0), 1);
-                        }
+//                            Vector3d ray0_worldFrame, ray1_worldFrame;
+//
+//                            ray0_worldFrame = RT_0.topLeftCorner(3, 3)*ray0;
+//                            ray1_worldFrame = RT_1.topLeftCorner(3, 3)*ray1;
+//
+//                            publishRay(origin0, ray0_worldFrame, "world", "rays_lighthouse_1", rand(),
+//                                       COLOR(1, 0, 1, 1.0), 1);
+//                            publishRay(origin1, ray1_worldFrame, "world", "rays_lighthouse_2", rand(),
+//                                       COLOR(1, 0, 1, 1.0), 1);
+//                        }
                         Vector3d pos(0, 0, 0);
                         ray0 *= 5;
                         publishRay(pos, ray0, "lighthouse1", "rays_lighthouse_1", getMessageID(RAY, sensor.first, 0),
@@ -488,7 +494,7 @@ bool LighthouseEstimator::poseEstimationP3P(){
 
 bool LighthouseEstimator::poseEstimationSensorCloud(){
     ros::Time start_time = ros::Time::now();
-    while (!estimateSensorPositionsUsingRelativeDistances(0, calibrated_sensors)) {
+    while (!estimateSensorPositionsUsingRelativeDistances(LIGHTHOUSE_A, calibrated_sensors)) {
         ROS_INFO_THROTTLE(1,
                           "could not estimate relative distance to lighthouse 0, are the sensors visible to lighthouse 0?!");
         if ((ros::Time::now() - start_time).sec > 10) {
@@ -497,7 +503,7 @@ bool LighthouseEstimator::poseEstimationSensorCloud(){
         }
     }
     start_time = ros::Time::now();
-    while (!estimateSensorPositionsUsingRelativeDistances(1, calibrated_sensors)) {
+    while (!estimateSensorPositionsUsingRelativeDistances(LIGHTHOUSE_B, calibrated_sensors)) {
         ROS_INFO_THROTTLE(1,
                           "could not estimate relative distance to lighthouse 1, are the sensors visible to lighthouse 1?!");
         if ((ros::Time::now() - start_time).sec > 10) {
