@@ -24,7 +24,7 @@ namespace DarkRoom {
 
         /**
          * Queries the tf listener for the specified transform
-         * @param lighthouse will be internally switched if necessary
+         * @param lighthouse
          * @param to another frame
          * @param transform the transform if available
          * @return true if available
@@ -33,7 +33,7 @@ namespace DarkRoom {
 
         /**
          * Queries the tf listener for the specified transform
-         * @param lighthouse will be internally switched if necessary
+         * @param lighthouse
          * @param from another frame
          * @param transform the transform if available
          * @return true if available

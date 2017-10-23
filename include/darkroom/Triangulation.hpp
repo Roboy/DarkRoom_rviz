@@ -5,7 +5,7 @@
 #include <Eigen/Dense>
 
 // offset from center of laser rotation
-#define AXIS_OFFSET -0.015
+#define AXIS_OFFSET 0.0 //-0.015
 
 using namespace Eigen;
 

@@ -39,7 +39,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 catkin_package(CATKIN_DEPENDS message_runtime roboy_communication_middleware common_utilities INCLUDE_DIRS include
         LIBRARIES ParticleFilter PoseEstimatorSensorCloud PoseEstimatorSensorDistance PoseEstimatorSensorDistances
-        Transform Triangulate LighthouseEstimator Sensor TrackedObject darkroom )
+        Transform Triangulate LighthouseEstimator LighthouseSimulator Sensor TrackedObject darkroom )
 
 include_directories(
 		include/
@@ -68,6 +68,9 @@ target_link_libraries( Transform ${catkin_LIBRARIES} )
 
 add_library( Triangulate src/Triangulation.cpp )
 target_link_libraries( Triangulate ${catkin_LIBRARIES} )
+
+add_library( LighthouseSimulator src/LighthouseSimulator.cpp )
+target_link_libraries( LighthouseSimulator ${catkin_LIBRARIES} Transform)
 
 add_library( LighthouseEstimator src/LighthouseEstimator.cpp  include/darkroom/mavmap/src/base3d/projection.cc
         include/darkroom/epnp/epnp.cpp include/darkroom/mavmap/src/base3d/p3p.cc include/darkroom/mavmap/src/util/math.cc)
