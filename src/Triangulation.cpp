@@ -34,7 +34,7 @@ double dist3D_Line_to_Line( Vector3d &pos0, Vector3d &dir1,
     return dP.norm();   // return the closest distance
 }
 
-double triangulateFromLighthousePlanes(Vector2d &angles0, Vector2d &angles1, Matrix4d &RT_0, Matrix4d &RT_1,
+double triangulateFromLighthouseAngles(Vector2d &angles0, Vector2d &angles1, Matrix4d &RT_0, Matrix4d &RT_1,
                                      Vector3d &triangulated_position, Vector3d &ray0, Vector3d &ray1) {
     ;
 

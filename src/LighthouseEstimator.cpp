@@ -67,7 +67,7 @@ void LighthouseEstimator::calibrateRelativeSensorDistances(){
                     timestamps1_old[sensor.first][1] = timestamp1_new[1];
 
                     Vector3d position, ray0, ray1;
-                    triangulateFromLighthousePlanes(lighthouse0_angles, lighthouse1_angles, RT_0, RT_1, position, ray0,
+                    triangulateFromLighthouseAngles(lighthouse0_angles, lighthouse1_angles, RT_0, RT_1, position, ray0,
                                                     ray1);
 
                     if (sensorPosition3d[sensor.first].size() > 0) {
@@ -210,10 +210,10 @@ bool LighthouseEstimator::estimateSensorPositionsUsingRelativeDistances(bool lig
                     sin(elevations[i]) * sin(azimuths[i]) * sin(elevations[j]) * sin(azimuths[j]) +
                     cos(elevations[i]) * cos(elevations[j]);
 
-            ROS_INFO("cosine between %d and %d: %f", i, j, cosineBetween(i, j));
+            ROS_DEBUG("cosine between %d and %d: %f", i, j, cosineBetween(i, j));
             // calculate the distance between the sensors
             distanceBetween(i, j) = (relPos[i] - relPos[j]).norm();
-            ROS_INFO("distance between sensor %d and %d: %f", ids[i], ids[j], distanceBetween(i, j));
+            ROS_DEBUG("distance between sensor %d and %d: %f", ids[i], ids[j], distanceBetween(i, j));
         }
     }
 
@@ -249,9 +249,6 @@ bool LighthouseEstimator::estimateSensorPositionsUsingRelativeDistances(bool lig
 
         error = v.norm() / (double) ids.size();
         if (error < ERROR_THRESHOLD) {
-            ROS_INFO_STREAM(
-                    "mean squared error " << error << " below threshold " << ERROR_THRESHOLD << " in " << iterations
-                                          << " iterations");
             break;
         }
         // construct distance new vector, sharing data with the stl container
@@ -277,16 +274,16 @@ bool LighthouseEstimator::estimateSensorPositionsUsingRelativeDistances(bool lig
         sprintf(str, "sensor_%d_estimated", id);
 
         publishSphere(relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
-                      getMessageID(DISTANCE, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.3), 0.01f, 100);
+                      getMessageID(DISTANCE, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.3), 0.01f, 3);
 
         sprintf(str, "ray_%d", id);
         Vector3d pos(0, 0, 0);
         publishRay(pos, relLocation, (lighthouse ? "lighthouse2" : "lighthouse1"), str,
-                   getMessageID(RAY, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.3), 100);
+                   getMessageID(RAY, id, lighthouse), COLOR(0, 1, lighthouse ? 0 : 1, 0.3), 3);
 
         sprintf(str, "%d", id);
         publishText(relLocation, str, (lighthouse ? "lighthouse2" : "lighthouse1"), "sensor_id", rand(),
-                    COLOR(1, 0, 0, 0.5), 0, 0.04f);
+                    COLOR(1, 0, 0, 0.5), 3, 0.04f);
     }
 
     for (auto id:ids) {
@@ -297,22 +294,22 @@ bool LighthouseEstimator::estimateSensorPositionsUsingRelativeDistances(bool lig
                 sensors[id2].get(lighthouse, pos2);
                 dir = pos2 - pos1;
                 publishRay(pos1, dir, (lighthouse ? "lighthouse2" : "lighthouse1"), "distance",
-                           rand(), COLOR(0, 1, lighthouse ? 0 : 1, 0.5));
+                           rand(), COLOR(0, 1, lighthouse ? 0 : 1, 0.5), 3);
 
                 if (distances) {
                     char str[100];
                     sprintf(str, "%.3f", dir.norm());
                     Vector3d pos = pos1 + dir / 2.0;
                     publishText(pos, str, (lighthouse ? "lighthouse2" : "lighthouse1"), "distance", rand(),
-                                COLOR(1, 0, 0, 0.5), 0, 0.02f);
+                                COLOR(1, 0, 0, 0.5), 3, 0.02f);
                 }
             }
         }
     }
 
-    ROS_WARN_STREAM("distance estimation terminated after " << iterations << " error: " << error);
-//        return true;
-//    }
+    ROS_WARN_STREAM(
+            "mean squared error " << error << " below threshold " << ERROR_THRESHOLD << " in " << iterations
+                                  << " iterations");
     return true;
 }
 
@@ -347,7 +344,7 @@ void LighthouseEstimator::triangulateSensors(){
                     timestamps1_old[sensor.first][1] = timestamp1_new[1];
 
                     Vector3d triangulated_position, ray0, ray1;
-                    triangulateFromLighthousePlanes(lighthouse0_angles, lighthouse1_angles, RT_0, RT_1,
+                    triangulateFromLighthouseAngles(lighthouse0_angles, lighthouse1_angles, RT_0, RT_1,
                                                     triangulated_position, ray0,
                                                     ray1);
 
@@ -357,10 +354,10 @@ void LighthouseEstimator::triangulateSensors(){
                         char str[100], str2[2];
                         sprintf(str, "sensor_%d", sensor.first);
                         publishSphere(triangulated_position, "world", str,
-                                      getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f, 1.0);
+                                      getMessageID(TRIANGULATED, sensor.first), COLOR(0, 1, 0, 0.8), 0.01f);
                         sprintf(str2, "%d", sensor.first);
                         publishText(triangulated_position, str2, "world", str, getMessageID(SENSOR_NAME, sensor.first),
-                                    COLOR(1, 1, 1, 0.7), 1.0, 0.04f);
+                                    COLOR(1, 1, 1, 0.7), 0, 0.04f);
                         msg.ids.push_back(sensor.first);
                         geometry_msgs::Vector3 v;
                         v.x = triangulated_position[0];
@@ -557,7 +554,7 @@ bool LighthouseEstimator::poseEstimationSensorCloud(){
     numDiff = new NumericalDiff<PoseEstimatorSensorCloud::PoseEstimator>(estimator);
     lm = new LevenbergMarquardt<NumericalDiff<PoseEstimatorSensorCloud::PoseEstimator>, double>(*numDiff);
     lm->parameters.maxfev = MAX_ITERATIONS;
-    lm->parameters.xtol = 1.0e-10;
+//    lm->parameters.xtol = 1.0e-10;
     int ret = lm->minimize(pose);
     ROS_INFO("PoseEstimationSensorCloud finished after %ld iterations, with an error of %f", lm->iter, lm->fnorm);
 

@@ -16,10 +16,14 @@ LighthouseSimulator::LighthouseSimulator(int id):id(id){
     spinner = boost::shared_ptr<ros::AsyncSpinner>(new ros::AsyncSpinner(1));
     spinner->start();
 
-    sensor_position[0] = Vector4d(0,0,0,1);
-    sensor_position[1] = Vector4d(0,0,0.1,1);
-    sensor_position[2] = Vector4d(0,0.1,0,1);
-    sensor_position[3] = Vector4d(0,0.1,0.1,1);
+    sensor_position[0] << 0,    0,      0,      1;
+    sensor_position[1] << 0,    0,      0.2,    1;
+    sensor_position[2] << 0,    0.2,    0,      1;
+    sensor_position[3] << 0,    0.2,    0.2,    1;
+    sensor_position[4] << 0.2,  0,      0,      1;
+    sensor_position[5] << 0.2,  0,      0.2,    1;
+    sensor_position[6] << 0.2,  0.2,    0,      1;
+    sensor_position[7] << 0.2,  0.2,    0.2,    1;
 
     class_counter++;
 }
@@ -56,27 +60,27 @@ void LighthouseSimulator::PublishSensorData(){
                     uint32_t elevation_in_ticks = (uint32_t)(degreesToTicks(elevation));
                     sensor_value = (uint32_t)(id<<31|1<<30|true<<29|elevation_in_ticks&0x1fffffff);
                     if(sensor.first == 0)
-                        ROS_INFO_THROTTLE(1, "elevation: %lf in ticks: %d", elevation, elevation_in_ticks);
+                        ROS_DEBUG_THROTTLE(1, "elevation: %lf in ticks: %d", elevation, elevation_in_ticks);
                 }else{
                     uint32_t azimuth_in_ticks = (uint32_t)(degreesToTicks(azimuth));
                     sensor_value = (uint32_t)(id<<31|0<<30|true<<29|azimuth_in_ticks&0x1fffffff);
                     if(sensor.first == 0)
-                        ROS_INFO_THROTTLE(1, "azimuth: %lf in ticks: %d", azimuth, azimuth_in_ticks);
+                        ROS_DEBUG_THROTTLE(1, "azimuth: %lf in ticks: %d", azimuth, azimuth_in_ticks);
                 }
 
                 msg.sensor_value.push_back(sensor_value);
                 Vector3d pos(sensor_pos[0],sensor_pos[1],sensor_pos[2]);
                 publishSphere(pos,(id==0?"lighthouse1":"lighthouse2"),"simulated_sensor_positions",
-                              sensor.first+id*sensor_position.size()+6543, COLOR(0,1,0,1), 0.01, 0.01);
+                              sensor.first+id*sensor_position.size()+6543, COLOR(0,1,0,1), 0.01);
             }else{
                 Vector3d pos(sensor_pos[0],sensor_pos[1],sensor_pos[2]);
                 publishSphere(pos,(id==0?"lighthouse1":"lighthouse2"),"simulated_sensor_positions",
-                              sensor.first+id*sensor_position.size()+7543, COLOR(1,0,0,1), 0.01);
+                              sensor.first+id*sensor_position.size()+7543, COLOR(1,0,0,1));
             }
-            Vector3d origin(0,0,0);
-            Vector3d dir(sensor_pos[0],sensor_pos[1],sensor_pos[2]);
-            publishRay(origin, dir,(id==0?"lighthouse1":"lighthouse2"),"simulated_sensor_rays",
-                       sensor.first+class_counter*sensor_position.size()+8543, COLOR(0,0,0,1), 0.01);
+//            Vector3d origin(0,0,0);
+//            Vector3d dir(sensor_pos[0],sensor_pos[1],sensor_pos[2]);
+//            publishRay(origin, dir,(id==0?"lighthouse1":"lighthouse2"),"simulated_sensor_rays",
+//                       sensor.first+class_counter*sensor_position.size()+8543, COLOR(0,0,0,1), 0.01);
         }
         angle_switch = !angle_switch;
 

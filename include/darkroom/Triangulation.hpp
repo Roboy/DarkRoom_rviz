@@ -26,16 +26,15 @@ double dist3D_Line_to_Line( Vector3d &pos0, Vector3d &dir1,
 
 /**
     * This function triangulates the position of a sensor using the horizontal and vertical angles from two ligthouses
-    * via planes
     * @param angles0 vertical/horizontal angles form first lighthouse
     * @param angles1 vertical/horizontal angles form second lighthouse
     * @param RT_0 pose matrix of first lighthouse
-    * @param RT_1 pose matrix of second lighthouse
+    * @param RT_1 pose matrix of second lighthouses
     * @param triangulated_position the triangulated position
     * @param ray0 ligthhouse ray
     * @param ray1 ligthhouse ray
     */
-double triangulateFromLighthousePlanes(Vector2d &angles0, Vector2d &angles1, Matrix4d &RT_0, Matrix4d &RT_1,
+double triangulateFromLighthouseAngles(Vector2d &angles0, Vector2d &angles1, Matrix4d &RT_0, Matrix4d &RT_1,
                                      Vector3d &triangulated_position, Vector3d &ray0, Vector3d &ray1);
 
 double triangulateFromRays(Vector3d &ray0, Vector3d &ray1, Matrix4d &RT_0, Matrix4d &RT_1, Vector3d &triangulated_position);
