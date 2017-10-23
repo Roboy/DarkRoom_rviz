@@ -566,7 +566,7 @@ bool LighthouseEstimator::poseEstimationSensorCloud(){
 
     roboy_communication_middleware::LighthousePoseCorrection msg;
     msg.id = LIGHTHOUSE_B;
-    msg.id = RELATIV;
+    msg.type = RELATIV;
     tf::transformTFToMsg(tf, msg.tf);
     lighthouse_pose_correction.publish(msg);
 

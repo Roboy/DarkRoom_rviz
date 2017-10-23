@@ -42,28 +42,10 @@ double triangulateFromLighthousePlanes(Vector2d &angles0, Vector2d &angles1, Mat
     rot0 = RT_0.topLeftCorner(3, 3);
     rot1 = RT_1.topLeftCorner(3, 3);
 
-    double theta0 = angles0(1), theta1 = angles1(1), beta0 = angles0(0), beta1 = angles1(0);
-    Eigen::Vector3d vec0_vertic(AXIS_OFFSET, sin(beta0), cos(beta0));
-    Eigen::Vector3d vec0_horizo(cos(theta0), sin(theta0), AXIS_OFFSET);
+    double azimuth0 = angles0(1), azimuth1 = angles1(1), elevation0 = angles0(0), elevation1 = angles1(0);
 
-    Eigen::Vector3d vec1_vertic(AXIS_OFFSET, sin(beta1), cos(beta1));
-    Eigen::Vector3d vec1_horizo(cos(theta1), sin(theta1), AXIS_OFFSET);
-    // calc normals lighthouse 0
-    Eigen::Vector3d n0_horizo = vec0_horizo.cross(Eigen::Vector3d::UnitZ());
-    n0_horizo.normalize();
-    Eigen::Vector3d n0_vertic = vec0_vertic.cross(Eigen::Vector3d::UnitX());
-    n0_vertic.normalize();
-    // calc normals lighthouse 1
-    Eigen::Vector3d n1_horizo = vec1_horizo.cross(Eigen::Vector3d::UnitZ());
-    n1_horizo.normalize();
-    Eigen::Vector3d n1_vertic = vec1_vertic.cross(Eigen::Vector3d::UnitX());
-    n1_vertic.normalize();
-    // calc line direction from cross product of hyperplane normals
-    Eigen::Vector3d u0 = n0_horizo.cross(n0_vertic);
-    Eigen::Vector3d u1 = n1_horizo.cross(n1_vertic);
-
-    ray0 = Vector3d(u0(0), u0(1), u0(2));
-    ray1 = Vector3d(u1(0), u1(1), u1(2));
+    ray0 = Vector3d(sin(elevation0)*cos(azimuth0), sin(elevation0)*sin(azimuth0), cos(elevation0));
+    ray1 = Vector3d(sin(elevation1)*cos(azimuth1), sin(elevation1)*sin(azimuth1), cos(elevation1));
 
     Vector3d ray0_worldFrame, ray1_worldFrame;
 
@@ -103,16 +85,6 @@ double triangulateFromRays(Vector3d &ray0, Vector3d &ray1,
 }
 
 void rayFromLighthouseAngles(Vector2d &angles, Vector3d &ray) {
-    double theta0 = angles(1), beta0 = angles(0);
-    Eigen::Vector3d vec0_vertic(AXIS_OFFSET, sin(beta0), cos(beta0));
-    Eigen::Vector3d vec0_horizo(cos(theta0), sin(theta0), AXIS_OFFSET);
-
-    // calc normals lighthouse
-    Eigen::Vector3d n_horizo = vec0_horizo.cross(Eigen::Vector3d::UnitZ());
-    n_horizo.normalize();
-    Eigen::Vector3d n_vertic = vec0_vertic.cross(Eigen::Vector3d::UnitX());
-    n_vertic.normalize();
-
-    // calc line direction from cross product of hyperplane normals
-    ray = n_horizo.cross(n_vertic);
+    double azimuth = angles(1), elevation = angles(0);
+    ray = Vector3d(sin(elevation)*cos(azimuth), sin(elevation)*sin(azimuth), cos(elevation));
 }
